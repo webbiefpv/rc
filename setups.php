@@ -78,8 +78,15 @@ require 'header.php';
                 <td><a href="setup_form.php?setup_id=<?php echo $setup['id']; ?>"><?php echo htmlspecialchars($setup['name']); ?></a></td>
                 <td><?php echo $setup['created_at']; ?></td>
                 <td>
-                    <button class="btn btn-sm btn-warning" onclick="editSetup(<?php echo $setup['id']; ?>, '<?php echo htmlspecialchars($setup['name']); ?>')">Edit</button>
-                    <form method="POST" style="display:inline;">
+                    <button class="btn btn-sm btn-warning" onclick="editSetup(<?php echo $setup['id']; ?>, '<?php echo htmlspecialchars(addslashes($setup['name'])); ?>')">Edit</button>
+
+                    <form method="POST" action="clone_setup.php" style="display:inline; margin-left: 5px;">
+                        <input type="hidden" name="original_setup_id" value="<?php echo $setup['id']; ?>">
+                        <input type="hidden" name="model_id" value="<?php echo $model_id; // Pass model_id for redirection if needed ?>">
+                        <button type="submit" name="clone_setup" class="btn btn-sm btn-info" onclick="return confirm('Are you sure you want to clone this setup?');">Clone</button>
+                    </form>
+
+                    <form method="POST" style="display:inline; margin-left: 5px;">
                         <input type="hidden" name="id" value="<?php echo $setup['id']; ?>">
                         <button type="submit" name="delete_setup" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">Delete</button>
                     </form>
