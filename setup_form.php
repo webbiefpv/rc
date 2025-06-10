@@ -231,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // The user ID and setup ID are already available at the top of your script
     // We also have the $setup variable which should contain the model_id
-
+    var_dump($_POST); die('Execution stopped for debugging. The "mark_as_baseline" block was reached.');
     $model_id = $setup['model_id'];
 
     // Use a transaction to ensure data integrity
