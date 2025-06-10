@@ -226,7 +226,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	header("Location: setups.php?model_id={$setup['model_id']}");
 	exit;
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_as_baseline'])) {
+    // Logic to mark this setup as the baseline for its model
+
+    // The user ID and setup ID are already available at the top of your script
+    // We also have the $setup variable which should contain the model_id
+
+    $model_id = $setup['model_id'];
+
+    // Use a transaction to ensure data integrity
+    $pdo->beginTransaction();
+    try {
+        // 1. First, set all other setups for this model to NOT be the baseline
+        $stmt_reset = $pdo->prepare("UPDATE setups SET is_baseline = 0 WHERE model_id = ? AND user_id = (SELECT user_id FROM models WHERE id = ?)");
+        // Note: The subquery for user_id is an extra security check, assuming setups table doesn't have user_id directly.
+        // A simpler way if your security model allows, since you already verified ownership of the setup:
+        // $stmt_reset = $pdo->prepare("UPDATE setups SET is_baseline = 0 WHERE model_id = ?");
+        $stmt_reset->execute([$model_id]);
+
+        // 2. Then, set the current setup to be the baseline
+        $stmt_set = $pdo->prepare("UPDATE setups SET is_baseline = 1 WHERE id = ?");
+        $stmt_set->execute([$setup_id]);
+
+        $pdo->commit();
+
+        // Optionally, set a success message to display
+        $_SESSION['success_message'] = "Setup marked as baseline successfully!";
+
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        // Set an error message
+        $_SESSION['error_message'] = "Failed to mark setup as baseline.";
+        error_log("Baseline marking failed: " . $e->getMessage());
+    }
+
+    // Redirect back to the same page to prevent form re-submission on refresh
+    header("Location: setup_form.php?setup_id=" . $setup_id);
+    exit;
 }
+
+// Check for and display messages
+$success_message = $_SESSION['success_message'] ?? null;
+unset($_SESSION['success_message']);
+$error_message = $_SESSION['error_message'] ?? null;
+unset($_SESSION['error_message']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
