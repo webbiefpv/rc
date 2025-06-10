@@ -79,6 +79,9 @@ require 'header.php';
                     <a href="setup_form.php?setup_id=<?php echo $setup['id']; ?>">
                         <?php echo htmlspecialchars($setup['name']); ?>
                     </a>
+
+                </td>
+                <td>
                     <?php if ($setup['is_baseline']): ?>
                         <span class="badge bg-warning text-dark ms-2">Baseline ⭐</span>
                     <?php endif; ?>

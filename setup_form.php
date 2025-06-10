@@ -32,8 +32,7 @@ $stmt->execute([$setup_id, 'rear']);
 $data['tires_rear'] = $stmt->fetch();
 
 // Handle form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) { // Check for the named save button
-    var_dump($_POST);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
     // START a transaction for the entire save operation
     $pdo->beginTransaction();
 
