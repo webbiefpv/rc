@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch setups
-$stmt = $pdo->prepare("SELECT * FROM setups WHERE model_id = ?");
+$stmt = $pdo->prepare("SELECT id, name, created_at, is_baseline FROM setups WHERE model_id = ?");
 $stmt->execute([$model_id]);
 $setups = $stmt->fetchAll();
 ?>
@@ -75,8 +75,17 @@ require 'header.php';
         <tbody>
 		<?php foreach ($setups as $setup): ?>
             <tr>
-                <td><a href="setup_form.php?setup_id=<?php echo $setup['id']; ?>"><?php echo htmlspecialchars($setup['name']); ?></a></td>
-                <td><?php echo $setup['created_at']; ?></td>
+                <td>
+                    <a href="setup_form.php?setup_id=<?php echo $setup['id']; ?>">
+                        <?php echo htmlspecialchars($setup['name']); ?>
+                    </a>
+                    <?php if ($setup['is_baseline']): ?>
+                        <span class="badge bg-warning text-dark ms-2">Baseline ⭐</span>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php echo $setup['created_at']; ?>
+                </td>
                 <td>
                     <button class="btn btn-sm btn-warning" onclick="editSetup(<?php echo $setup['id']; ?>, '<?php echo htmlspecialchars(addslashes($setup['name'])); ?>')">Edit</button>
 

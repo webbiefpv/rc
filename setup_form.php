@@ -315,6 +315,18 @@ unset($_SESSION['error_message']);
         </div>
     </div>
 </nav>
+
+<!--Successful Baseline Message-->
+<h1>Setup: <?php echo htmlspecialchars($setup['name']); ?></h1>
+
+<?php if ($success_message): ?>
+    <div class="alert alert-success"><?php echo $success_message; ?></div>
+<?php endif; ?>
+<?php if ($error_message): ?>
+    <div class="alert alert-danger"><?php echo $error_message; ?></div>
+<?php endif; ?>
+<!-- -->
+
 <div class="container mt-3">
     <h1>Setup: <?php echo htmlspecialchars($setup['name']); ?></h1>
     <form method="POST">
@@ -434,6 +446,7 @@ unset($_SESSION['error_message']);
         <div class="mb-3">
             <a href="export_csv.php?setup_id=<?php echo $setup_id; ?>" class="btn btn-info">Download CSV</a>
             <button type="button" class="btn btn-warning" onclick="shareSetup()">Share</button>
+            <button type="submit" name="mark_as_baseline" class="btn btn-outline-warning ms-2">Mark as Baseline ⭐</button>
         </div>
 
         <!-- Comments -->
