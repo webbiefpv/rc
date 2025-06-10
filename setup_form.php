@@ -2,7 +2,8 @@
 require 'db_config.php';
 require 'auth.php';
 requireLogin();
-
+$_SESSION['success_message'];
+$_SESSION['error_message'];
 $setup_id = $_GET['setup_id'];
 $user_id = $_SESSION['user_id'];
 
