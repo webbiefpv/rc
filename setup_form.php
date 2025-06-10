@@ -33,7 +33,7 @@ $data['tires_rear'] = $stmt->fetch();
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) { // Check for the named save button
-
+    var_dump($_POST); die('DEBUG: Save block executed.');
     // START a transaction for the entire save operation
     $pdo->beginTransaction();
 
@@ -313,6 +313,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) { // C
 </nav>
 <div class="container mt-3">
     <h1>Setup: <?php echo htmlspecialchars($setup['name']); ?></h1>
+
+
+
     <form method="POST">
         <!-- Front Suspension -->
         <h3>Front Suspension</h3>
@@ -442,7 +445,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) { // C
             <input class="form-check-input" type="checkbox" role="switch" id="is_baseline_checkbox" name="is_baseline" value="1" <?php echo ($setup['is_baseline'] ?? 0) ? 'checked' : ''; ?>>
             <label class="form-check-label" for="is_baseline_checkbox">Set as Baseline ⭐</label>
         </div>
-        <button type="submit" class="btn btn-primary">Save Setup</button>
+        <button type="submit" name="save_setup" class="btn btn-primary">Save Setup</button>
     </form>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
