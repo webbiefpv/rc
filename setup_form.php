@@ -33,7 +33,7 @@ $data['tires_rear'] = $stmt->fetch();
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) { // Check for the named save button
-    var_dump($_POST); die('DEBUG: Save block executed.');
+    var_dump($_POST);
     // START a transaction for the entire save operation
     $pdo->beginTransaction();
 
@@ -314,7 +314,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) { // C
 <div class="container mt-3">
     <h1>Setup: <?php echo htmlspecialchars($setup['name']); ?></h1>
 
-
+    <?php if (isset($_GET['success'])): ?>
+        <div class="alert alert-success">Setup saved successfully!</div>
+    <?php endif; ?>
+    <?php if (isset($_GET['error'])): ?>
+        <div class="alert alert-danger">There was an error saving the setup. Please try again.</div>
+    <?php endif; ?>
 
     <form method="POST">
         <!-- Front Suspension -->
