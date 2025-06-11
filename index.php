@@ -162,7 +162,7 @@ require 'header.php'; // Your common header
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5>📌 Current Selected Setup</h5>
+                    <h5>Current Selected Setup</h5>
                 </div>
                 <div class="card-body">
                     <?php if ($current_setup): ?>
