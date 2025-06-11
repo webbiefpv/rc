@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $message = '<div class="alert alert-danger">File is too large. Maximum size is 2 MB.</div>';
         } else {
             // 2. Create a unique filename to prevent overwriting
-            $upload_dir = 'uploads/'; // The folder you created in Step 2
+            $upload_dir = 'track_images/'; // The folder you created in Step 2
             $file_extension = pathinfo($_FILES['track_image']['name'], PATHINFO_EXTENSION);
             $unique_filename = uniqid('track_', true) . '.' . $file_extension;
             $destination = $upload_dir . $unique_filename;
