@@ -26,20 +26,46 @@ $tracks_count = $stmt_tracks_count->fetchColumn();
 $latest_setup = null;
 
 // --- LATEST SETUP ---
-$stmt_latest_setup = $pdo->prepare("
-    SELECT s.id, s.name as setup_name, s.created_at, s.is_baseline, m.name as model_name,
-           GROUP_CONCAT(t.name ORDER BY t.name SEPARATOR ', ') as tags
-    FROM setups s
-    JOIN models m ON s.model_id = m.id
-    LEFT JOIN setup_tags st ON s.id = st.setup_id
-    LEFT JOIN tags t ON st.tag_id = t.id
-    WHERE m.user_id = ?
-    GROUP BY s.id
-    ORDER BY s.created_at DESC
-    LIMIT 1
-");
-$stmt_latest_setup->execute([$user_id]);
-$latest_setup = $stmt_latest_setup->fetch(PDO::FETCH_ASSOC);
+// --- Fetch Current Selected Setup ---
+$current_setup = null;
+// First, find the user's selected_setup_id from the 'users' table
+$stmt_get_selected_id = $pdo->prepare("SELECT selected_setup_id FROM users WHERE id = ?");
+$stmt_get_selected_id->execute([$user_id]);
+$selected_id = $stmt_get_selected_id->fetchColumn();
+
+// If an ID is selected, fetch that specific setup's details
+if ($selected_id) {
+    $stmt_current_setup = $pdo->prepare("
+        SELECT s.id, s.name as setup_name, s.created_at, s.is_baseline, m.name as model_name,
+               GROUP_CONCAT(t.name ORDER BY t.name SEPARATOR ', ') as tags
+        FROM setups s
+        JOIN models m ON s.model_id = m.id
+        LEFT JOIN setup_tags st ON s.id = st.setup_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        WHERE s.id = ? AND m.user_id = ?
+        GROUP BY s.id
+    ");
+    $stmt_current_setup->execute([$selected_id, $user_id]);
+    $current_setup = $stmt_current_setup->fetch(PDO::FETCH_ASSOC);
+}
+
+// FALLBACK: If no setup is selected OR the selected setup was somehow invalid, show the latest setup instead.
+if (!$current_setup) {
+    $stmt_latest_setup = $pdo->prepare("
+        SELECT s.id, s.name as setup_name, s.created_at, s.is_baseline, m.name as model_name,
+               GROUP_CONCAT(t.name ORDER BY t.name SEPARATOR ', ') as tags
+        FROM setups s
+        JOIN models m ON s.model_id = m.id
+        LEFT JOIN setup_tags st ON s.id = st.setup_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        WHERE m.user_id = ?
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+        LIMIT 1
+    ");
+    $stmt_latest_setup->execute([$user_id]);
+    $current_setup = $stmt_latest_setup->fetch(PDO::FETCH_ASSOC);
+}
 
 // --- Recent Models (e.g., last 3) ---
 $recent_models = [];
