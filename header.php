@@ -18,6 +18,9 @@
 				<li class="nav-item">
 					<a class="nav-link" href="race_log.php">Race Log</a>
 				</li>
+                <li class="nav-item">
+                    <a class="nav-link" href="events.php">Events</a>
+                </li>
 				<li class="nav-item">
 					<a class="nav-link" href="glossary.php">On-Road Setup Glossary</a>
 				</li>
