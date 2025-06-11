@@ -15,6 +15,17 @@ if (!$setup || $setup['user_id'] != $user_id) {
 	exit;
 }
 
+$stmt_tags = $pdo->prepare("
+    SELECT t.name 
+    FROM tags t 
+    JOIN setup_tags st ON t.id = st.tag_id 
+    WHERE st.setup_id = ?
+");
+
+$stmt_tags->execute([$setup_id]);
+$tags_array = $stmt_tags->fetchAll(PDO::FETCH_COLUMN);
+$tags_string = implode(', ', $tags_array); // e.g., "high-grip, rainy"
+
 // Fetch existing data
 $tables = ['front_suspension', 'rear_suspension', 'drivetrain', 'body_chassis', 'electronics', 'esc_settings', 'comments'];
 $data = [];
@@ -37,6 +48,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
     $pdo->beginTransaction();
 
     try {
+
+        // --- HANDLE TAGS ---
+        // 1. Get the raw tag string from the form and clean it up
+        $tags_input_string = trim($_POST['tags'] ?? '');
+        // Split the string by commas, trim whitespace from each tag, and remove any empty tags
+        $tag_names = array_filter(array_map('trim', explode(',', $tags_input_string)));
+
+        $tag_ids_for_setup = []; // We'll collect the IDs of the tags to be associated with the setup
+
+        if (!empty($tag_names)) {
+            foreach ($tag_names as $tag_name) {
+                // 2. For each tag name, check if it already exists for this user
+                $stmt_find_tag = $pdo->prepare("SELECT id FROM tags WHERE user_id = ? AND name = ?");
+                $stmt_find_tag->execute([$user_id, $tag_name]);
+                $tag_id = $stmt_find_tag->fetchColumn();
+
+                // 3. If the tag doesn't exist, create it
+                if (!$tag_id) {
+                    $stmt_insert_tag = $pdo->prepare("INSERT INTO tags (user_id, name) VALUES (?, ?)");
+                    $stmt_insert_tag->execute([$user_id, $tag_name]);
+                    $tag_id = $pdo->lastInsertId();
+                }
+                $tag_ids_for_setup[] = $tag_id;
+            }
+        }
+
+        // 4. Sync the setup_tags table: Delete old associations and insert the new ones.
+        // This is the easiest way to handle additions, removals, and changes all at once.
+        $stmt_delete_old_tags = $pdo->prepare("DELETE FROM setup_tags WHERE setup_id = ?");
+        $stmt_delete_old_tags->execute([$setup_id]);
+
+        if (!empty($tag_ids_for_setup)) {
+            $stmt_insert_new_tags = $pdo->prepare("INSERT INTO setup_tags (setup_id, tag_id) VALUES (?, ?)");
+            foreach ($tag_ids_for_setup as $tag_id) {
+                $stmt_insert_new_tags->execute([$setup_id, $tag_id]);
+            }
+        }
+
         // --- HANDLE THE BASELINE CHECKBOX ---
         $is_baseline = isset($_POST['is_baseline']) ? 1 : 0;
         $model_id = $setup['model_id'];
@@ -438,7 +487,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
             <a href="export_csv.php?setup_id=<?php echo $setup_id; ?>" class="btn btn-info">Download CSV</a>
             <button type="button" class="btn btn-warning" onclick="shareSetup()">Share</button>
         </div>
-
+        <div class="mb-3">
+            <label for="tags" class="form-label">Tags</label>
+            <input type="text" class="form-control" id="tags" name="tags" value="<?php echo htmlspecialchars($tags_string); ?>">
+            <div class="form-text">Enter tags separated by commas (e.g., high-grip, rainy, competition).</div>
+        </div>
         <!-- Comments -->
         <h3>Comments</h3>
         <div class="mb-3">

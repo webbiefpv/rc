@@ -34,9 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch setups
-$stmt = $pdo->prepare("SELECT id, name, created_at, is_baseline FROM setups WHERE model_id = ?");
+$stmt = $pdo->prepare("
+    SELECT s.id, s.name, s.created_at, s.is_baseline, 
+           GROUP_CONCAT(t.name ORDER BY t.name SEPARATOR ', ') as tags
+    FROM setups s
+    LEFT JOIN setup_tags st ON s.id = st.setup_id
+    LEFT JOIN tags t ON st.tag_id = t.id
+    WHERE s.model_id = ?
+    GROUP BY s.id
+    ORDER BY s.is_baseline DESC, s.created_at DESC
+");
 $stmt->execute([$model_id]);
-$setups = $stmt->fetchAll();
+$setups = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -84,6 +93,15 @@ require 'header.php';
                 <td>
                     <?php if ($setup['is_baseline']): ?>
                         <span class="badge bg-warning text-dark ms-2">Baseline ⭐</span>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php if (!empty($setup['tags'])): ?>
+                        <div class="mt-2">
+                            <?php foreach (explode(', ', $setup['tags']) as $tag): ?>
+                                <span class="badge bg-secondary"><?php echo htmlspecialchars($tag); ?></span>
+                            <?php endforeach; ?>
+                        </div>
                     <?php endif; ?>
                 </td>
                 <td>
