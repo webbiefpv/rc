@@ -70,16 +70,6 @@ $stmt_recent_setups = $pdo->prepare($stmt_recent_setups_sql);
 $stmt_recent_setups->execute([$user_id]);
 $recent_setups = $stmt_recent_setups->fetchAll(PDO::FETCH_ASSOC);
 
-$stmt_recent_setups_sql = "SELECT s.id, s.name as setup_name, s.created_at, m.name as model_name
-                           FROM setups s
-                           JOIN models m ON s.model_id = m.id
-                           WHERE m.user_id = ?
-                           ORDER BY s.created_at DESC
-                           LIMIT 4"; // Fetch a few
-$stmt_recent_setups = $pdo->prepare($stmt_recent_setups_sql);
-$stmt_recent_setups->execute([$user_id]);
-$recent_setups = $stmt_recent_setups->fetchAll(PDO::FETCH_ASSOC);
-
 
 ?>
 <!DOCTYPE html>
