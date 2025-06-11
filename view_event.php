@@ -84,6 +84,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             error_log("Race log insert failed: " . $e->getMessage());
         }
     }
+}elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_log') {
+    $log_id_to_delete = intval($_POST['log_id_to_delete']);
+
+    // Security check: ensure the log belongs to the user before deleting
+    $stmt_check = $pdo->prepare("SELECT id FROM race_logs WHERE id = ? AND user_id = ?");
+    $stmt_check->execute([$log_id_to_delete, $user_id]);
+    if ($stmt_check->fetch()) {
+        // Log exists and belongs to user, so delete it
+        $stmt_delete = $pdo->prepare("DELETE FROM race_logs WHERE id = ?");
+        $stmt_delete->execute([$log_id_to_delete]);
+    }
+
+    // Redirect back to the same event page
+    header("Location: view_event.php?event_id=" . $event_id . "&deleted=1");
+    exit;
+}
+
+// Add a check for the new 'deleted' flag to show a message
+if (isset($_GET['deleted']) && $_GET['deleted'] == 1) {
+    $message = '<div class="alert alert-info">Race log entry has been deleted.</div>';
 }
 
 
@@ -243,6 +263,12 @@ $race_logs = $stmt_logs->fetchAll();
                         <td><?php echo htmlspecialchars($log['best_3_consecutive_avg']); ?></td>
                         <td style="font-size: 0.8rem;"><?php echo nl2br(htmlspecialchars($log['car_performance_notes'])); ?></td>
                         <td>
+                            <a href="edit_race_log.php?log_id=<?php echo $log['id']; ?>" class="btn btn-sm btn-warning">Edit</a>
+                            <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this log entry?');">
+                                <input type="hidden" name="action" value="delete_log">
+                                <input type="hidden" name="log_id_to_delete" value="<?php echo $log['id']; ?>">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
                         </td>
                     </tr>
                 <?php endforeach; ?>
