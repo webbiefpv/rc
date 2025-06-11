@@ -13,13 +13,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 	$grip_level = $_POST['grip_level'];
 	$layout_type = $_POST['layout_type'];
 	$notes = trim($_POST['notes']);
+    $rotation_week_number = !empty($_POST['rotation_week_number']) ? intval($_POST['rotation_week_number']) : null;
+    $track_image_url = trim($_POST['track_image_url']);
 
 	if (empty($name) || !in_array($surface_type, ['carpet', 'asphalt', 'concrete', 'other']) ||
 	    !in_array($grip_level, ['low', 'medium', 'high']) || !in_array($layout_type, ['tight', 'mixed', 'open'])) {
 		$message = '<div class="alert alert-danger">Invalid input. Please check all fields.</div>';
 	} else {
-		$stmt = $pdo->prepare("INSERT INTO tracks (user_id, name, length_meters, surface_type, grip_level, layout_type, notes) VALUES (?, ?, ?, ?, ?, ?, ?)");
-		$stmt->execute([$user_id, $name, $length_meters, $surface_type, $grip_level, $layout_type, $notes]);
+        $stmt = $pdo->prepare("INSERT INTO tracks (user_id, name, length_meters, surface_type, grip_level, layout_type, notes, rotation_week_number, track_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$user_id, $name, $length_meters, $surface_type, $grip_level, $layout_type, $notes, $rotation_week_number, $track_image_url]);
 		$message = '<div class="alert alert-success">Track added successfully!</div>';
 	}
 }
@@ -97,6 +99,17 @@ require 'header.php';
                         <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
                     </div>
                 </div>
+                <div class="row g-2">
+                    <div class="col-md-4 mb-3">
+                        <label for="rotation_week_number" class="form-label">Rotation Week # (1-6)</label>
+                        <input type="number" class="form-control" id="rotation_week_number" name="rotation_week_number" min="1" max="6">
+                    </div>
+                    <div class="col-md-8 mb-3">
+                        <label for="track_image_url" class="form-label">Track Image URL</label>
+                        <input type="text" class="form-control" id="track_image_url" name="track_image_url" placeholder="e.g., /images/track1.jpg">
+                    </div>
+
+                </div>
                 <button type="submit" class="btn btn-primary">Add Track</button>
             </form>
         </div>
@@ -108,11 +121,13 @@ require 'header.php';
         <table class="table table-striped">
             <thead>
             <tr>
+                <th>Layout</th>
                 <th>Name</th>
                 <th>Length (m)</th>
                 <th>Surface</th>
                 <th>Grip</th>
-                <th>Layout</th>
+                <th>Layout Type</th>
+                <th>Week #</th>
                 <th>Notes</th>
                 <th>Actions</th>
             </tr>
@@ -120,11 +135,17 @@ require 'header.php';
             <tbody>
 			<?php foreach ($tracks as $track): ?>
                 <tr>
+                    <td>
+                        <?php if (!empty($track['track_image_url'])): ?>
+                            <img src="<?php echo htmlspecialchars($track['track_image_url']); ?>" alt="Track Layout" style="width: 100px; height: auto;">
+                        <?php endif; ?>
+                    </td>
                     <td><?php echo htmlspecialchars($track['name']); ?></td>
                     <td><?php echo $track['length_meters'] ?: 'N/A'; ?></td>
                     <td><?php echo ucfirst($track['surface_type']); ?></td>
                     <td><?php echo ucfirst($track['grip_level']); ?></td>
                     <td><?php echo ucfirst($track['layout_type']); ?></td>
+                    <td><?php echo $track['rotation_week_number'] ?: 'N/A'; ?></td>
                     <td><?php echo htmlspecialchars($track['notes'] ?: 'N/A'); ?></td>
                     <td>
                         <form method="POST" style="display:inline;">
