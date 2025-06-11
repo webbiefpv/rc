@@ -170,19 +170,19 @@ require 'header.php';
             <tbody>
 			<?php foreach ($tracks as $track): ?>
                 <tr>
-                    <td>
+                    <td style="vertical-align: middle">
                         <?php if (!empty($track['track_image_url'])): ?>
                             <img src="<?php echo htmlspecialchars($track['track_image_url']); ?>" alt="Track Layout" style="width: 100px; height: auto;">
                         <?php endif; ?>
                     </td>
-                    <td><?php echo htmlspecialchars($track['name']); ?></td>
-                    <td><?php echo $track['length_meters'] ?: 'N/A'; ?></td>
-                    <td><?php echo ucfirst($track['surface_type']); ?></td>
-                    <td><?php echo ucfirst($track['grip_level']); ?></td>
-                    <td><?php echo ucfirst($track['layout_type']); ?></td>
-                    <td><?php echo $track['rotation_week_number'] ?: 'N/A'; ?></td>
-                    <td><?php echo htmlspecialchars($track['notes'] ?: 'N/A'); ?></td>
-                    <td>
+                    <td style="vertical-align: middle"><?php echo htmlspecialchars($track['name']); ?></td>
+                    <td style="vertical-align: middle"><?php echo $track['length_meters'] ?: 'N/A'; ?></td>
+                    <td style="vertical-align: middle"><?php echo ucfirst($track['surface_type']); ?></td>
+                    <td style="vertical-align: middle"><?php echo ucfirst($track['grip_level']); ?></td>
+                    <td style="vertical-align: middle"><?php echo ucfirst($track['layout_type']); ?></td>
+                    <td style="vertical-align: middle"><?php echo $track['rotation_week_number'] ?: 'N/A'; ?></td>
+                    <td style="vertical-align: middle"><?php echo htmlspecialchars($track['notes'] ?: 'N/A'); ?></td>
+                    <td style="vertical-align: middle">
                         <form method="POST" style="display:inline;">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="track_id" value="<?php echo $track['id']; ?>">
