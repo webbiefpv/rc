@@ -510,13 +510,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
             <label for="comments_comment" class="form-label">Comment</label>
             <textarea class="form-control" id="comments_comment" name="comments[comment]"><?php echo htmlspecialchars($data['comments']['comment'] ?? ''); ?></textarea>
         </div>
-        <div class="form-check form-switch ms-4">
+        <div class="form-check form-switch ms-auto">
             <input class="form-check-input" type="checkbox" role="switch" id="is_baseline_checkbox" name="is_baseline" value="1" <?php echo ($setup['is_baseline'] ?? 0) ? 'checked' : ''; ?>>
-            <label class="form-check-label" for="is_baseline_checkbox">Set as Baseline ⭐</label>
+            <label class="form-check-label" for="is_baseline_checkbox">Set as Baseline</label>
         </div>
         <div class="form-check form-switch ms-auto">
             <input class="form-check-input" type="checkbox" role="switch" id="current_setup_checkbox" name="current_setup" value="1" <?php echo ($current_selected_id == $setup_id) ? 'checked' : ''; ?>>
-            <label class="form-check-label" for="current_setup_checkbox">Set as Current Setup 📌</label>
+            <label class="form-check-label" for="current_setup_checkbox">Set as Current Setup</label>
         </div>
         <button type="submit" name="save_setup" class="btn btn-primary">Save Setup</button>
     </form>
