@@ -24,11 +24,17 @@ $tracks_count = $stmt_tracks_count->fetchColumn();
 
 // --- Latest Setup (as a proxy for "Selected Setup") ---
 $latest_setup = null;
+
+// --- LATEST SETUP ---
 $stmt_latest_setup = $pdo->prepare("
-    SELECT s.id, s.name as setup_name, s.created_at, m.name as model_name
+    SELECT s.id, s.name as setup_name, s.created_at, s.is_baseline, m.name as model_name,
+           GROUP_CONCAT(t.name ORDER BY t.name SEPARATOR ', ') as tags
     FROM setups s
     JOIN models m ON s.model_id = m.id
+    LEFT JOIN setup_tags st ON s.id = st.setup_id
+    LEFT JOIN tags t ON st.tag_id = t.id
     WHERE m.user_id = ?
+    GROUP BY s.id
     ORDER BY s.created_at DESC
     LIMIT 1
 ");
@@ -44,24 +50,26 @@ $recent_models = $stmt_recent_models->fetchAll(PDO::FETCH_ASSOC);
 // --- Recent Setups (e.g., last 3, excluding the one already shown as "latest" if necessary, or just top N) ---
 // For simplicity, let's fetch the top 3-4 most recent setups overall.
 // If $latest_setup is one of them, it might appear again here or you can filter it out in the loop.
+
+
 $recent_setups = [];
-$stmt_recent_setups = $pdo->prepare("
-    SELECT s.id, s.name as setup_name, s.created_at, m.name as model_name
+
+// --- RECENT SETUPS ---
+$stmt_recent_setups_sql = "
+    SELECT s.id, s.name as setup_name, s.created_at, s.is_baseline, m.name as model_name,
+           GROUP_CONCAT(t.name ORDER BY t.name SEPARATOR ', ') as tags
     FROM setups s
     JOIN models m ON s.model_id = m.id
-    WHERE m.user_id = ? ");
-// Optionally, if you want to ensure these are different from latest_setup if it exists:
-// if ($latest_setup) {
-// $stmt_recent_setups_sql .= " AND s.id != ? ";
-// }
-// $stmt_recent_setups_sql .= " ORDER BY s.created_at DESC LIMIT 3";
-// $stmt_recent_setups = $pdo->prepare($stmt_recent_setups_sql);
-// if ($latest_setup) {
-// $stmt_recent_setups->execute([$user_id, $latest_setup['id']]);
-// } else {
-// $stmt_recent_setups->execute([$user_id]);
-// }
-// Simpler: just get top N recent, latest will be among them. User can see it in context.
+    LEFT JOIN setup_tags st ON s.id = st.setup_id
+    LEFT JOIN tags t ON st.tag_id = t.id
+    WHERE m.user_id = ?
+    GROUP BY s.id
+    ORDER BY s.created_at DESC
+    LIMIT 4";
+$stmt_recent_setups = $pdo->prepare($stmt_recent_setups_sql);
+$stmt_recent_setups->execute([$user_id]);
+$recent_setups = $stmt_recent_setups->fetchAll(PDO::FETCH_ASSOC);
+
 $stmt_recent_setups_sql = "SELECT s.id, s.name as setup_name, s.created_at, m.name as model_name
                            FROM setups s
                            JOIN models m ON s.model_id = m.id
@@ -142,10 +150,26 @@ require 'header.php'; // Your common header
                 </div>
                 <div class="card-body">
                     <?php if ($latest_setup): ?>
-                        <h5 class="card-title"><?php echo htmlspecialchars($latest_setup['setup_name']); ?></h5>
-                        <h6 class="card-subtitle mb-2 text-muted"><?php echo htmlspecialchars($latest_setup['model_name']); ?></h6>
+                        <h5 class="card-title">
+                            <?php echo htmlspecialchars($latest_setup['setup_name']); ?>
+                            <?php if ($latest_setup['is_baseline']): ?>
+                                <span class="badge bg-warning text-dark ms-1">Baseline ⭐</span>
+                            <?php endif; ?>
+                        </h5>
+                        <?php if (!empty($latest_setup['tags'])): ?>
+                            <div class="mt-2">
+                                <?php foreach (explode(', ', $latest_setup['tags']) as $tag): ?>
+                                    <span class="badge bg-secondary"><?php echo htmlspecialchars($tag); ?></span>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                        <h6 class="card-subtitle mb-2 text-muted">
+                            <?php echo htmlspecialchars($latest_setup['model_name']); ?>
+                        </h6>
                         <p class="card-text">
-                            <small>Created: <?php echo date("D, M j Y, g:i a", strtotime($latest_setup['created_at'])); ?></small>
+                            <small>
+                                Created: <?php echo date("D, M j Y, g:i a", strtotime($latest_setup['created_at'])); ?>
+                            </small>
                         </p>
                         <a href="setup_form.php?setup_id=<?php echo $latest_setup['id']; ?>" class="btn btn-sm btn-outline-success">View/Edit Setup</a>
                     <?php else: ?>
@@ -193,10 +217,22 @@ require 'header.php'; // Your common header
                                 ?>
                                 <a href="setup_form.php?setup_id=<?php echo $setup['id']; ?>" class="list-group-item list-group-item-action">
                                     <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1"><?php echo htmlspecialchars($setup['setup_name']); ?></h6>
+                                        <h6 class="mb-1">
+                                            <?php echo htmlspecialchars($setup['setup_name']); ?>
+                                            <?php if ($setup['is_baseline']): ?>
+                                                <span class="badge bg-warning text-dark ms-1">Baseline ⭐</span>
+                                            <?php endif; ?>
+                                        </h6>
                                         <small><?php echo date("M j, Y", strtotime($setup['created_at'])); ?></small>
                                     </div>
                                     <p class="mb-1 text-muted small"><?php echo htmlspecialchars($setup['model_name']); ?></p>
+                                    <?php if (!empty($setup['tags'])): ?>
+                                        <div class="mt-1">
+                                            <?php foreach (explode(', ', $setup['tags']) as $tag): ?>
+                                                <span class="badge bg-secondary"><?php echo htmlspecialchars($tag); ?></span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </a>
                             <?php endforeach; ?>
                         </div>

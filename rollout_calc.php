@@ -40,9 +40,10 @@ $models = $stmt->fetchAll();
 // Fetch setups if a model is selected
 $setups = [];
 if (!empty($model_id)) {
-	$stmt = $pdo->prepare("SELECT id, name FROM setups WHERE model_id = ?");
-	$stmt->execute([$model_id]);
-	$setups = $stmt->fetchAll();
+    // This query now fetches is_baseline and puts baseline setups at the top of the list
+    $stmt = $pdo->prepare("SELECT id, name, is_baseline FROM setups WHERE model_id = ? ORDER BY is_baseline DESC, name ASC");
+    $stmt->execute([$model_id]);
+    $setups = $stmt->fetchAll();
 }
 
 // Fetch tracks
@@ -145,7 +146,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'compare') {
 }
 
 // Fetch saved calculations
-$stmt = $pdo->prepare("SELECT rc.*, m.name AS model_name, s.name AS setup_name, t.name AS track_name FROM rollout_calculations rc LEFT JOIN models m ON rc.model_id = m.id LEFT JOIN setups s ON rc.setup_id = s.id LEFT JOIN tracks t ON rc.track_id = t.id WHERE rc.user_id = ? ORDER BY rc.created_at DESC");
+$stmt = $pdo->prepare("
+    SELECT rc.*, m.name AS model_name, s.name AS setup_name, t.name AS track_name,
+           GROUP_CONCAT(tags.name ORDER BY tags.name SEPARATOR ', ') as setup_tags
+    FROM rollout_calculations rc
+    LEFT JOIN models m ON rc.model_id = m.id
+    LEFT JOIN setups s ON rc.setup_id = s.id
+    LEFT JOIN tracks t ON rc.track_id = t.id
+    LEFT JOIN setup_tags st ON s.id = st.setup_id
+    LEFT JOIN tags ON st.tag_id = tags.id
+    WHERE rc.user_id = ?
+    GROUP BY rc.id
+    ORDER BY rc.created_at DESC
+");
 $stmt->execute([$user_id]);
 $saved_calculations = $stmt->fetchAll();
 
@@ -292,7 +305,8 @@ require 'header.php';
                     <option value="">Select a setup</option>
 					<?php foreach ($setups as $setup): ?>
                         <option value="<?php echo $setup['id']; ?>" <?php echo $setup_id == $setup['id'] ? 'selected' : ''; ?>>
-							<?php echo htmlspecialchars($setup['name']); ?>
+                            <?php echo htmlspecialchars($setup['name']); ?>
+                            <?php echo $setup['is_baseline'] ? ' ⭐' : ''; ?>
                         </option>
 					<?php endforeach; ?>
                 </select>
@@ -411,6 +425,7 @@ require 'header.php';
                         <th>Model</th>
                         <th>Setup</th>
                         <th>Track</th>
+                        <th>Tags</th>
                         <th>Tire Diameter</th>
                         <th>Spur/Pinion</th>
                         <th>Rollout</th>
@@ -427,6 +442,13 @@ require 'header.php';
                             <td><?php echo htmlspecialchars($calc['model_name'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars($calc['setup_name'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars($calc['track_name'] ?? 'N/A'); ?></td>
+                            <td>
+                                <?php if (!empty($calc['setup_tags'])): ?>
+                                    <?php foreach (explode(', ', $calc['setup_tags']) as $tag): ?>
+                                        <span class="badge bg-secondary"><?php echo htmlspecialchars($tag); ?></span>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo round($calc['unit'] === 'mm' ? $calc['tire_diameter'] : $calc['tire_diameter'] / 25.4, 2); ?> <?php echo $calc['unit']; ?></td>
                             <td><?php echo $calc['spur_teeth']; ?>/<?php echo $calc['pinion_teeth']; ?></td>
                             <td><?php echo round($calc['unit'] === 'mm' ? $calc['rollout'] : $calc['rollout'] / 25.4, 2); ?> <?php echo $calc['unit']; ?></td>

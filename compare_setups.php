@@ -12,11 +12,11 @@ $setup2_name_display = ''; // For displaying the name of setup 2
 
 // Fetch all setups for the current user for the dropdowns
 $stmt_all_setups = $pdo->prepare("
-    SELECT s.id, s.name as setup_name, m.name as model_name 
+    SELECT s.id, s.name as setup_name, s.is_baseline, m.name as model_name 
     FROM setups s 
     JOIN models m ON s.model_id = m.id 
     WHERE m.user_id = ? 
-    ORDER BY m.name, s.name
+    ORDER BY m.name, s.is_baseline DESC, s.name
 ");
 $stmt_all_setups->execute([$user_id]);
 $available_setups = $stmt_all_setups->fetchAll(PDO::FETCH_ASSOC);
@@ -25,12 +25,16 @@ $available_setups = $stmt_all_setups->fetchAll(PDO::FETCH_ASSOC);
 function getSetupDetails($pdo, $setup_id, $user_id) {
     $details = [];
 
-    // First, verify the setup belongs to the user and get its name and model name
+    // First, verify the setup belongs to the user and get its name, model name, baseline status, and tags
     $stmt_main = $pdo->prepare("
-        SELECT s.name as setup_name, m.name as model_name, s.model_id 
+        SELECT s.name as setup_name, s.is_baseline, m.name as model_name, s.model_id,
+               GROUP_CONCAT(t.name ORDER BY t.name SEPARATOR ', ') as tags
         FROM setups s 
-        JOIN models m ON s.model_id = m.id 
+        JOIN models m ON s.model_id = m.id
+        LEFT JOIN setup_tags st ON s.id = st.setup_id
+        LEFT JOIN tags t ON st.tag_id = t.id
         WHERE s.id = ? AND m.user_id = ?
+        GROUP BY s.id
     ");
     $stmt_main->execute([$setup_id, $user_id]);
     $main_info = $stmt_main->fetch(PDO::FETCH_ASSOC);
@@ -40,16 +44,17 @@ function getSetupDetails($pdo, $setup_id, $user_id) {
     }
     $details['setup_name'] = $main_info['setup_name'];
     $details['model_name'] = $main_info['model_name'];
-    $details['model_id'] = $main_info['model_id']; // Store model_id if needed later
+    $details['model_id'] = $main_info['model_id'];
+    $details['is_baseline'] = $main_info['is_baseline']; // Store baseline status
+    $details['tags'] = $main_info['tags']; // Store tags string
 
-    // Define tables and their columns to fetch (similar to export_csv.php or setup_form.php)
-    // You might want to create a more structured way to define these fields globally if used in multiple places
+    // Define tables and their columns to fetch (same as your existing code)
     $data_tables = [
         'front_suspension' => ['ackermann', 'arms', 'bumpsteer', 'droop_shims', 'kingpin_fluid', 'ride_height', 'arm_shims', 'springs', 'steering_blocks', 'steering_limiter', 'track_wheel_shims', 'notes'],
         'rear_suspension'  => ['axle_height', 'centre_pivot_ball', 'centre_pivot_fluid', 'droop', 'rear_pod_shims', 'rear_spring', 'ride_height', 'side_bands_lr', 'notes'],
         'drivetrain'       => ['axle_type', 'drive_ratio', 'gear_pitch', 'rollout', 'spur'],
         'body_chassis'     => ['battery_position', 'body', 'body_mounting', 'chassis', 'electronics_layout', 'motor_position', 'motor_shims', 'rear_wing', 'screw_turn_buckles', 'servo_position', 'weight_balance_fr', 'weight_total', 'weights'],
-        'electronics'      => ['battery', 'battery_c_rating', 'battery_brand', 'capacity', 'model', /* 'charging_notes' is a textarea, handle separately or ensure it's in this list */ 'esc_brand', 'esc_model', 'motor_kv_constant', 'motor_brand', 'motor_model', 'motor_timing', 'motor_wind', 'radio_brand', 'radio_model', 'receiver_model', 'servo_brand', 'servo_model', 'transponder_id', 'charging_notes'],
+        'electronics'      => ['battery', 'battery_c_rating', 'battery_brand', 'capacity', 'model', 'esc_brand', 'esc_model', 'motor_kv_constant', 'motor_brand', 'motor_model', 'motor_timing', 'motor_wind', 'radio_brand', 'radio_model', 'receiver_model', 'servo_brand', 'servo_model', 'transponder_id', 'charging_notes'],
         'esc_settings'     => ['boost_activation', 'boost_rpm_end', 'boost_rpm_start', 'boost_ramp', 'boost_timing', 'brake_curve', 'brake_drag', 'brake_frequency', 'brake_initial_strength', 'race_mode', 'throttle_curve', 'throttle_frequency', 'throttle_initial_strength', 'throttle_neutral_range', 'throttle_strength', 'turbo_activation_method', 'turbo_delay', 'turbo_ramp', 'turbo_timing'],
         'comments'         => ['comment']
     ];
@@ -64,7 +69,7 @@ function getSetupDetails($pdo, $setup_id, $user_id) {
             }
         } else {
             foreach ($fields as $field) {
-                $details[$table_name . '_' . $field] = ''; // Set empty if no record for this table
+                $details[$table_name . '_' . $field] = '';
             }
         }
     }
@@ -116,6 +121,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // The keys should match the keys in $setup_details_1 and $setup_details_2
 // The values are the human-readable labels for the table.
 $comparison_fields_structure = [
+    'Meta Data' => [
+        'is_baseline' => 'Baseline Status',
+        'tags' => 'Tags',
+    ],
     'Front Suspension' => [
         'front_suspension_ackermann' => 'Ackermann',
         'front_suspension_arms' => 'Arms',
@@ -272,8 +281,9 @@ $comparison_fields_structure = [
                 <select name="setup_id_1" id="setup_id_1" class="form-select" required>
                     <option value="">-- Choose Setup 1 --</option>
                     <?php foreach ($available_setups as $setup): ?>
-                        <option value="<?php echo $setup['id']; ?>" <?php echo (isset($_POST['setup_id_1']) && $_POST['setup_id_1'] == $setup['id']) ? 'selected' : ''; ?>>
+                        <option value="<?php echo $setup['id']; ?>" <?php /* your existing selected logic */ ?> >
                             <?php echo htmlspecialchars($setup['model_name'] . ' - ' . $setup['setup_name']); ?>
+                            <?php echo $setup['is_baseline'] ? ' ⭐' : ''; ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -282,11 +292,10 @@ $comparison_fields_structure = [
                 <label for="setup_id_2" class="form-label fw-bold">Select Setup 2:</label>
                 <select name="setup_id_2" id="setup_id_2" class="form-select" required>
                     <option value="">-- Choose Setup 2 --</option>
-                    <?php foreach ($available_setups as $setup): ?>
-                        <option value="<?php echo $setup['id']; ?>" <?php echo (isset($_POST['setup_id_2']) && $_POST['setup_id_2'] == $setup['id']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($setup['model_name'] . ' - ' . $setup['setup_name']); ?>
-                        </option>
-                    <?php endforeach; ?>
+                    <option value="<?php echo $setup['id']; ?>" <?php /* your existing selected logic */ ?> >
+                        <?php echo htmlspecialchars($setup['model_name'] . ' - ' . $setup['setup_name']); ?>
+                        <?php echo $setup['is_baseline'] ? ' ⭐' : ''; ?>
+                    </option>
                 </select>
             </div>
             <div class="col-md-2 mb-2">
@@ -312,9 +321,33 @@ $comparison_fields_structure = [
                     <?php $first_in_group = true; ?>
                     <?php foreach ($fields_in_group as $field_key => $field_label): ?>
                         <?php
-                        $value1 = $setup_details_1[$field_key] ?? '';
-                        $value2 = $setup_details_2[$field_key] ?? '';
-                        $diff_class = (trim((string)$value1) !== trim((string)$value2)) ? 'highlight-diff' : '';
+                        $value1_raw = $setup_details_1[$field_key] ?? '';
+                        $value2_raw = $setup_details_2[$field_key] ?? '';
+                        $value1_display = '';
+                        $value2_display = '';
+
+// Special display logic for our new fields
+                        if ($field_key === 'is_baseline') {
+                            $value1_display = $value1_raw ? '<span class="badge bg-warning text-dark">Baseline ⭐</span>' : 'Not Baseline';
+                            $value2_display = $value2_raw ? '<span class="badge bg-warning text-dark">Baseline ⭐</span>' : 'Not Baseline';
+                        } elseif ($field_key === 'tags') {
+                            if (!empty($value1_raw)) {
+                                foreach(explode(', ', $value1_raw) as $tag) {
+                                    $value1_display .= '<span class="badge bg-secondary me-1">' . htmlspecialchars($tag) . '</span>';
+                                }
+                            }
+                            if (!empty($value2_raw)) {
+                                foreach(explode(', ', $value2_raw) as $tag) {
+                                    $value2_display .= '<span class="badge bg-secondary me-1">' . htmlspecialchars($tag) . '</span>';
+                                }
+                            }
+                        } else {
+                            // Default handling for all other text fields
+                            $value1_display = nl2br(htmlspecialchars($value1_raw));
+                            $value2_display = nl2br(htmlspecialchars($value2_raw));
+                        }
+
+                        $diff_class = (trim((string)$value1_raw) !== trim((string)$value2_raw)) ? 'highlight-diff' : '';
                         ?>
                         <tr>
                             <?php if ($first_in_group): ?>
@@ -324,8 +357,8 @@ $comparison_fields_structure = [
                                 <?php $first_in_group = false; ?>
                             <?php endif; ?>
                             <td><?php echo htmlspecialchars($field_label); ?></td>
-                            <td class="<?php echo $diff_class; ?>"><?php echo nl2br(htmlspecialchars($value1)); ?></td>
-                            <td class="<?php echo $diff_class; ?>"><?php echo nl2br(htmlspecialchars($value2)); ?></td>
+                            <td class="<?php echo $diff_class; ?>"><?php echo $value1_display; ?></td>
+                            <td class="<?php echo $diff_class; ?>"><?php echo $value2_display; ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endforeach; ?>

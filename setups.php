@@ -77,6 +77,8 @@ require 'header.php';
         <thead>
         <tr>
             <th>Name</th>
+            <th>Is Baseline</th>
+            <th>Tags</th>
             <th>Created</th>
             <th>Actions</th>
         </tr>
