@@ -6,6 +6,10 @@ requireLogin();
 $user_id = $_SESSION['user_id'];
 $message = '';
 
+if (isset($_GET['added']) && $_GET['added'] == 1) {
+    $message = '<div class="alert alert-success">Track added successfully!</div>';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add') {
 
     // --- Collect Text Data ---
@@ -57,15 +61,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $stmt = $pdo->prepare("INSERT INTO tracks (user_id, name, length_meters, surface_type, grip_level, layout_type, notes, rotation_week_number, track_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$user_id, $name, $length_meters, $surface_type, $grip_level, $layout_type, $notes, $rotation_week_number, $track_image_path]);
             $message = '<div class="alert alert-success">Track added successfully!</div>';
+            header("Location: tracks.php?added=1"); // Redirect to the same page with a success flag
+            exit; // Always call exit() after a header redirect
         }
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
-	$track_id = intval($_POST['track_id']);
-	$stmt = $pdo->prepare("DELETE FROM tracks WHERE id = ? AND user_id = ?");
-	$stmt->execute([$track_id, $user_id]);
-	$message = '<div class="alert alert-success">Track deleted successfully!</div>';
+    $track_id = intval($_POST['track_id']);
+
+    // 1. Check if the track is used in rollout_calculations
+    $stmt_check_rollout = $pdo->prepare("SELECT COUNT(*) FROM rollout_calculations WHERE track_id = ? AND user_id = ?");
+    $stmt_check_rollout->execute([$track_id, $user_id]);
+    $rollout_count = $stmt_check_rollout->fetchColumn();
+
+    // 2. Check if the track is used in race_logs
+    $stmt_check_logs = $pdo->prepare("SELECT COUNT(*) FROM race_logs WHERE track_id = ? AND user_id = ?");
+    $stmt_check_logs->execute([$track_id, $user_id]);
+    $logs_count = $stmt_check_logs->fetchColumn();
+
+    // 3. If the track is not used anywhere, proceed with deletion
+    if ($rollout_count == 0 && $logs_count == 0) {
+        $stmt = $pdo->prepare("DELETE FROM tracks WHERE id = ? AND user_id = ?");
+        $stmt->execute([$track_id, $user_id]);
+        $message = '<div class="alert alert-success">Track deleted successfully!</div>';
+    } else {
+        // 4. Otherwise, show a helpful error message
+        $message = '<div class="alert alert-danger">Cannot delete this track because it is in use by ' . $rollout_count . ' rollout calculation(s) and ' . $logs_count . ' race log(s). Please delete those entries first.</div>';
+    }
 }
 
 $stmt = $pdo->prepare("SELECT * FROM tracks WHERE user_id = ? ORDER BY name");
