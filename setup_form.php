@@ -15,6 +15,11 @@ if (!$setup || $setup['user_id'] != $user_id) {
 	exit;
 }
 
+// Verify Current setup
+$stmt_get_selected_id = $pdo->prepare("SELECT selected_setup_id FROM users WHERE id = ?");
+$stmt_get_selected_id->execute([$user_id]);
+$current_selected_id = $stmt_get_selected_id->fetchColumn();
+
 $stmt_tags = $pdo->prepare("
     SELECT t.name 
     FROM tags t 
@@ -48,6 +53,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
     $pdo->beginTransaction();
 
     try {
+
+        // --- HANDLE THE "CURRENT SETUP" CHECKBOX ---
+        // We only act if the box was checked on submit
+        if (isset($_POST['current_setup'])) {
+            $stmt_pin = $pdo->prepare("UPDATE users SET selected_setup_id = ? WHERE id = ?");
+            $stmt_pin->execute([$setup_id, $user_id]);
+        }
 
         // --- HANDLE TAGS ---
         // 1. Get the raw tag string from the form and clean it up
@@ -501,6 +513,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
         <div class="form-check form-switch ms-4">
             <input class="form-check-input" type="checkbox" role="switch" id="is_baseline_checkbox" name="is_baseline" value="1" <?php echo ($setup['is_baseline'] ?? 0) ? 'checked' : ''; ?>>
             <label class="form-check-label" for="is_baseline_checkbox">Set as Baseline ⭐</label>
+        </div>
+        <div class="form-check form-switch ms-auto">
+            <input class="form-check-input" type="checkbox" role="switch" id="current_setup_checkbox" name="current_setup" value="1" <?php echo ($current_selected_id == $setup_id) ? 'checked' : ''; ?>>
+            <label class="form-check-label" for="current_setup_checkbox">Set as Current Setup 📌</label>
         </div>
         <button type="submit" name="save_setup" class="btn btn-primary">Save Setup</button>
     </form>
