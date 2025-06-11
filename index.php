@@ -162,37 +162,38 @@ require 'header.php'; // Your common header
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5>⭐ Latest Setup</h5>
+                    <h5>📌 Current Selected Setup</h5>
                 </div>
                 <div class="card-body">
-                    <?php if ($latest_setup): ?>
+                    <?php if ($current_setup): ?>
                         <h5 class="card-title">
-                            <?php echo htmlspecialchars($latest_setup['setup_name']); ?>
-                            <?php if ($latest_setup['is_baseline']): ?>
+                            <?php echo htmlspecialchars($current_setup['setup_name']); ?>
+                            <?php if ($current_setup['is_baseline']): ?>
                                 <span class="badge bg-warning text-dark ms-1">Baseline ⭐</span>
                             <?php endif; ?>
                         </h5>
-                        <?php if (!empty($latest_setup['tags'])): ?>
-                            <div class="mt-2">
-                                <?php foreach (explode(', ', $latest_setup['tags']) as $tag): ?>
+                        <h6 class="card-subtitle mb-2 text-muted">
+                            <?php echo htmlspecialchars($current_setup['model_name']); ?>
+                        </h6>
+                        <?php if (!empty($current_setup['tags'])): ?>
+                            <div class="mb-2">
+                                <?php foreach (explode(', ', $current_setup['tags']) as $tag): ?>
                                     <span class="badge bg-secondary"><?php echo htmlspecialchars($tag); ?></span>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
-                        <h6 class="card-subtitle mb-2 text-muted">
-                            <?php echo htmlspecialchars($latest_setup['model_name']); ?>
-                        </h6>
                         <p class="card-text">
                             <small>
-                                Created: <?php echo date("D, M j Y, g:i a", strtotime($latest_setup['created_at'])); ?>
+                                Created: <?php echo date("D, M j Y, g:i a", strtotime($current_setup['created_at'])); ?>
                             </small>
                         </p>
-                        <a href="setup_form.php?setup_id=<?php echo $latest_setup['id']; ?>" class="btn btn-sm btn-outline-success">View/Edit Setup</a>
+                        <a href="setup_form.php?setup_id=<?php echo $current_setup['id']; ?>" class="btn btn-sm btn-outline-success">View/Edit Setup</a>
                     <?php else: ?>
-                        <p class="card-text">No setups found yet. Go add one!</p>
+                        <p class="card-text">No setups found yet. Pin one to see it here!</p>
                     <?php endif; ?>
                 </div>
             </div>
+        </div>
         </div>
 
         <div class="col-lg-6 mb-4">
