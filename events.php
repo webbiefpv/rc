@@ -6,6 +6,14 @@ requireLogin();
 $user_id = $_SESSION['user_id'];
 $message = '';
 
+if (isset($_GET['added']) && $_GET['added'] == 1) {
+    $message = '<div class="alert alert-success">Race Event created successfully!</div>';
+}
+// ADD THIS NEW CHECK
+if (isset($_GET['deleted']) && $_GET['deleted'] == 1) {
+    $message = '<div class="alert alert-success">Race Event and all its logs have been deleted.</div>';
+}
+
 // Check for a success message from the redirect
 if (isset($_GET['added']) && $_GET['added'] == 1) {
     $message = '<div class="alert alert-success">Race Event created successfully!</div>';
@@ -103,16 +111,30 @@ $events_list = $stmt_events->fetchAll();
             <p>No events created yet.</p>
         <?php else: ?>
             <?php foreach ($events_list as $event): ?>
-                <a href="view_event.php?event_id=<?php echo $event['id']; ?>" class="list-group-item list-group-item-action">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1"><?php echo htmlspecialchars($event['event_name']); ?></h5>
-                        <small><?php echo date("D, M j, Y", strtotime($event['event_date'])); ?></small>
+                <div class="list-group-item">
+                    <div class="row align-items-center">
+                        <div class="col-md-9">
+                            <a href="view_event.php?event_id=<?php echo $event['id']; ?>" class="text-decoration-none text-dark">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1"><?php echo htmlspecialchars($event['event_name']); ?></h5>
+                                    <small><?php echo date("D, M j, Y", strtotime($event['event_date'])); ?></small>
+                                </div>
+                                <p class="mb-1">Track: <?php echo htmlspecialchars($event['track_name']); ?></p>
+                                <?php if (!empty($event['notes'])): ?>
+                                    <small class="text-muted"><?php echo htmlspecialchars($event['notes']); ?></small>
+                                <?php endif; ?>
+                            </a>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <a href="#" class="btn btn-sm btn-outline-secondary disabled">Edit</a>
+                            <form method="POST" style="display:inline-block; margin-left: 5px;" onsubmit="return confirm('WARNING: Deleting this event will also delete ALL associated race logs. This cannot be undone. Are you sure?');">
+                                <input type="hidden" name="action" value="delete_event">
+                                <input type="hidden" name="event_id_to_delete" value="<?php echo $event['id']; ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </div>
                     </div>
-                    <p class="mb-1">Track: <?php echo htmlspecialchars($event['track_name']); ?></p>
-                    <?php if (!empty($event['notes'])): ?>
-                        <small class="text-muted"><?php echo htmlspecialchars($event['notes']); ?></small>
-                    <?php endif; ?>
-                </a>
+                </div>
             <?php endforeach; ?>
         <?php endif; ?>
     </div>
