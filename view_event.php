@@ -6,7 +6,8 @@ requireLogin();
 $user_id = $_SESSION['user_id'];
 $message = '';
 
-// 1. Get the Event ID from the URL and verify it belongs to the user
+// Section 1: Get the Event ID from the URL and verify it belongs to the user
+// ==============================================================================
 if (!isset($_GET['event_id'])) {
     header('Location: events.php');
     exit;
@@ -23,27 +24,44 @@ $stmt_event->execute([$event_id, $user_id]);
 $event = $stmt_event->fetch(PDO::FETCH_ASSOC);
 
 if (!$event) {
-    // Event not found or doesn't belong to the user
+    // Event not found or doesn't belong to the user, redirect them.
     header('Location: events.php?error=notfound');
     exit;
 }
 
-// Check for a success message from the redirect
+// Check for a success message from a previous redirect
 if (isset($_GET['added']) && $_GET['added'] == 1) {
     $message = '<div class="alert alert-success">Race log added to the event successfully!</div>';
 }
 
-// 2. Handle the "Add New Log" form submission
+
+// Section 2: Handle the "Add New Log" form submission
+// ==============================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_log') {
-    // Collect data from the form
+    // --- Collect data from the form ---
     $setup_id = intval($_POST['setup_id']);
-    $event_type = trim($_POST['event_type']);
-    $race_date = $event['event_date'] . ' ' . trim($_POST['race_time']); // Combine event date with submitted time
+    $race_time = trim($_POST['race_time']);
+    $race_date = $event['event_date'] . ' ' . ($race_time ?: '00:00:00');
+
+    // --- Construct the event_type string from the dynamic inputs ---
+    $event_category = $_POST['event_category'] ?? 'Practice';
+    $event_type = $event_category; // Default to the category name
+
+    if ($event_category === 'Qualifier') {
+        $round_number = !empty($_POST['round_number']) ? intval($_POST['round_number']) : 1;
+        $event_type = 'Qualifier ' . $round_number;
+    } elseif ($event_category === 'Final') {
+        $final_letter = !empty($_POST['final_letter']) ? strtoupper(trim($_POST['final_letter'])) : 'A';
+        $event_type = $final_letter . ' Final';
+    }
+
+    // --- Collect the rest of the form data ---
     $laps_completed = !empty($_POST['laps_completed']) ? intval($_POST['laps_completed']) : null;
-    $total_race_time = trim($_POST['total_race_time']);
-    $best_lap_time = trim($_POST['best_lap_time']);
-    $best_10_avg = trim($_POST['best_10_avg']);
-    $best_3_consecutive_avg = trim($_POST['best_3_consecutive_avg']);
+    $total_race_time = trim($_POST['total_race_time']) ?: null;
+    $best_lap_time = trim($_POST['best_lap_time']) ?: null;
+    $best_10_avg = trim($_POST['best_10_avg']) ?: null;
+    $best_3_consecutive_avg = trim($_POST['best_3_consecutive_avg']) ?: null;
+    $finishing_position = !empty($_POST['finishing_position']) ? intval($_POST['finishing_position']) : null;
     $track_conditions_notes = trim($_POST['track_conditions_notes']);
     $car_performance_notes = trim($_POST['car_performance_notes']);
     $lap_times_pasted = trim($_POST['lap_times']);
@@ -53,15 +71,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } else {
         $pdo->beginTransaction();
         try {
-            // Insert the main log entry
+            // --- Insert the main log entry into 'race_logs' table ---
             $stmt_insert_log = $pdo->prepare("
-                INSERT INTO race_logs (user_id, event_id, track_id, setup_id, race_date, event_type, laps_completed, total_race_time, best_lap_time, best_10_avg, best_3_consecutive_avg, track_conditions_notes, car_performance_notes) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO race_logs (user_id, event_id, track_id, setup_id, race_date, event_type, laps_completed, total_race_time, best_lap_time, best_10_avg, best_3_consecutive_avg, finishing_position, track_conditions_notes, car_performance_notes) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt_insert_log->execute([$user_id, $event_id, $event['track_id'], $setup_id, $race_date, $event_type, $laps_completed, $total_race_time, $best_lap_time, $best_10_avg, $best_3_consecutive_avg, $track_conditions_notes, $car_performance_notes]);
+            $stmt_insert_log->execute([$user_id, $event_id, $event['track_id'], $setup_id, $race_date, $event_type, $laps_completed, $total_race_time, $best_lap_time, $best_10_avg, $best_3_consecutive_avg, $finishing_position, $track_conditions_notes, $car_performance_notes]);
             $new_race_log_id = $pdo->lastInsertId();
 
-            // Parse and insert individual lap times
+            // --- Parse and insert individual lap times into 'race_lap_times' table ---
             if (!empty($lap_times_pasted)) {
                 $lap_times_array = preg_split('/[\s,]+/', $lap_times_pasted); // Split by space, comma, or newline
                 $stmt_insert_lap = $pdo->prepare("INSERT INTO race_lap_times (race_log_id, lap_number, lap_time) VALUES (?, ?, ?)");
@@ -74,40 +92,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
 
+            // If everything was successful, commit the changes and redirect
             $pdo->commit();
             header("Location: view_event.php?event_id=" . $event_id . "&added=1");
             exit;
 
         } catch (PDOException $e) {
+            // If anything failed, roll back all changes and show an error
             $pdo->rollBack();
             $message = '<div class="alert alert-danger">An error occurred while saving the log.</div>';
             error_log("Race log insert failed: " . $e->getMessage());
         }
     }
-}elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_log') {
-    $log_id_to_delete = intval($_POST['log_id_to_delete']);
-
-    // Security check: ensure the log belongs to the user before deleting
-    $stmt_check = $pdo->prepare("SELECT id FROM race_logs WHERE id = ? AND user_id = ?");
-    $stmt_check->execute([$log_id_to_delete, $user_id]);
-    if ($stmt_check->fetch()) {
-        // Log exists and belongs to user, so delete it
-        $stmt_delete = $pdo->prepare("DELETE FROM race_logs WHERE id = ?");
-        $stmt_delete->execute([$log_id_to_delete]);
-    }
-
-    // Redirect back to the same event page
-    header("Location: view_event.php?event_id=" . $event_id . "&deleted=1");
-    exit;
-}
-
-// Add a check for the new 'deleted' flag to show a message
-if (isset($_GET['deleted']) && $_GET['deleted'] == 1) {
-    $message = '<div class="alert alert-info">Race log entry has been deleted.</div>';
 }
 
 
-// 3. Fetch data needed for the page display
+// Section 3: Fetch Data needed for Page Display
+// ==============================================================================
 // Fetch Setups for the "Add Log" form dropdown
 $stmt_setups = $pdo->prepare("
     SELECT s.id, s.name as setup_name, m.name as model_name, s.is_baseline 
@@ -117,9 +118,9 @@ $stmt_setups = $pdo->prepare("
     ORDER BY m.name, s.is_baseline DESC, s.name
 ");
 $stmt_setups->execute([$user_id]);
-$setups_list = $stmt_setups->fetchAll();
+$setups_list = $stmt_setups->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch existing race logs for THIS event
+// Fetch existing race logs for THIS event to display in the table
 $stmt_logs = $pdo->prepare("
     SELECT 
         rl.*, 
@@ -132,7 +133,7 @@ $stmt_logs = $pdo->prepare("
     ORDER BY rl.race_date ASC
 ");
 $stmt_logs->execute([$event_id]);
-$race_logs = $stmt_logs->fetchAll();
+$race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
 
 ?>
 <!DOCTYPE html>
@@ -154,7 +155,7 @@ $race_logs = $stmt_logs->fetchAll();
                     <img src="<?php echo htmlspecialchars($event['track_image_url']); ?>" class="img-fluid rounded-start" alt="Track Layout">
                 </div>
             <?php endif; ?>
-            <div class="col-md-10">
+            <div class="col-md-10 ps-md-3">
                 <div class="card-body py-0">
                     <h2 class="card-title"><?php echo htmlspecialchars($event['event_name']); ?></h2>
                     <p class="card-text">
@@ -179,11 +180,25 @@ $race_logs = $stmt_logs->fetchAll();
             <form method="POST">
                 <input type="hidden" name="action" value="add_log">
                 <div class="row g-3">
-                    <div class="col-md-3">
-                        <label for="race_time" class="form-label">Time of Race</label>
-                        <input type="time" class="form-control" id="race_time" name="race_time" required>
+                    <div class="col-md-4">
+                        <label for="event_category" class="form-label">Event Type</label>
+                        <select class="form-select" id="event_category" name="event_category" required>
+                            <option value="Practice" selected>Practice</option>
+                            <option value="Qualifier">Qualifier</option>
+                            <option value="Final">Final</option>
+                        </select>
                     </div>
-                    <div class="col-md-5">
+
+                    <div class="col-md-2" id="qualifier_round_div" style="display: none;">
+                        <label for="round_number" class="form-label">Round #</label>
+                        <input type="number" class="form-control" id="round_number" name="round_number" min="1" value="1">
+                    </div>
+
+                    <div class="col-md-2" id="final_letter_div" style="display: none;">
+                        <label for="final_letter" class="form-label">Final</label>
+                        <input type="text" class="form-control" id="final_letter" name="final_letter" placeholder="e.g., A, B..." maxlength="2">
+                    </div>
+                    <div class="col-md-4">
                         <label for="setup_id" class="form-label">Setup Used</label>
                         <select class="form-select" id="setup_id" name="setup_id" required>
                             <option value="">Select a setup...</option>
@@ -195,20 +210,11 @@ $race_logs = $stmt_logs->fetchAll();
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <label for="event_type" class="form-label">Event Type</label>
-                        <select class="form-select" id="event_type" name="event_type" required>
-                            <option value="Practice">Practice</option>
-                            <option value="Qualifier 1">Qualifier 1</option>
-                            <option value="Qualifier 2">Qualifier 2</option>
-                            <option value="Qualifier 3">Qualifier 3</option>
-                            <option value="Qualifier 4">Qualifier 4</option>
-                            <option value="A Final">A Final</option>
-                            <option value="B Final">B Final</option>
-                            <option value="C Final">C Final</option>
-                        </select>
+                    <div class="col-md-2">
+                        <label for="race_time" class="form-label">Time of Race</label>
+                        <input type="time" class="form-control" id="race_time" name="race_time" required>
                     </div>
-
+                    <hr class="my-3">
                     <div class="col-md-2"><label for="laps_completed" class="form-label">Laps</label><input type="number" class="form-control" id="laps_completed" name="laps_completed"></div>
                     <div class="col-md-2"><label for="total_race_time" class="form-label">Total Time</label><input type="text" class="form-control" id="total_race_time" name="total_race_time" placeholder="e.g., 305.54"></div>
                     <div class="col-md-2"><label for="best_lap_time" class="form-label">Best Lap</label><input type="text" class="form-control" id="best_lap_time" name="best_lap_time" placeholder="e.g., 11.05"></div>
@@ -236,7 +242,7 @@ $race_logs = $stmt_logs->fetchAll();
 
     <h3>Logged Sessions for this Event</h3>
     <div class="table-responsive">
-        <table class="table table-striped table-hover">
+        <table class="table table-striped table-hover align-middle">
             <thead>
             <tr>
                 <th>Session</th>
@@ -257,18 +263,16 @@ $race_logs = $stmt_logs->fetchAll();
                     <tr>
                         <td><strong><?php echo htmlspecialchars($log['event_type']); ?></strong><br><small><?php echo date("g:i a", strtotime($log['race_date'])); ?></small></td>
                         <td><a href="setup_form.php?setup_id=<?php echo $log['setup_id']; ?>"><?php echo htmlspecialchars($log['model_name'] . ' - ' . $log['setup_name']); ?></a></td>
-                        <td><?php echo ($log['laps_completed'] ? $log['laps_completed'] . ' / ' : '') . $log['total_race_time']; ?></td>
-                        <td><?php echo htmlspecialchars($log['best_lap_time']); ?></td>
-                        <td><?php echo htmlspecialchars($log['best_10_avg']); ?></td>
-                        <td><?php echo htmlspecialchars($log['best_3_consecutive_avg']); ?></td>
-                        <td style="font-size: 0.8rem;"><?php echo nl2br(htmlspecialchars($log['car_performance_notes'])); ?></td>
+                        <td><?php echo ($log['laps_completed'] ? $log['laps_completed'] . ' / ' . $log['total_race_time'] : 'N/A'); ?></td>
+                        <td><?php echo htmlspecialchars($log['best_lap_time'] ?: 'N/A'); ?></td>
+                        <td><?php echo htmlspecialchars($log['best_10_avg'] ?: 'N/A'); ?></td>
+                        <td><?php echo htmlspecialchars($log['best_3_consecutive_avg'] ?: 'N/A'); ?></td>
+                        <td style="font-size: 0.8rem;">
+                            <?php if(!empty($log['car_performance_notes'])) { echo '<strong>Car:</strong> ' . nl2br(htmlspecialchars($log['car_performance_notes'])); } ?>
+                            <?php if(!empty($log['track_conditions_notes'])) { echo '<br><strong>Track:</strong> ' . nl2br(htmlspecialchars($log['track_conditions_notes'])); } ?>
+                        </td>
                         <td>
-                            <a href="edit_race_log.php?log_id=<?php echo $log['id']; ?>" class="btn btn-sm btn-warning">Edit</a>
-                            <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this log entry?');">
-                                <input type="hidden" name="action" value="delete_log">
-                                <input type="hidden" name="log_id_to_delete" value="<?php echo $log['id']; ?>">
-                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                            </form>
+                            <button class="btn btn-sm btn-outline-secondary" disabled>Edit</button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -278,6 +282,28 @@ $race_logs = $stmt_logs->fetchAll();
     </div>
 
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // JavaScript to dynamically show/hide the round number and final letter inputs
+    document.addEventListener('DOMContentLoaded', function() {
+        const eventCategorySelect = document.getElementById('event_category');
+        const qualifierDiv = document.getElementById('qualifier_round_div');
+        const finalDiv = document.getElementById('final_letter_div');
+
+        function toggleInputs() {
+            const selectedCategory = eventCategorySelect.value;
+
+            qualifierDiv.style.display = (selectedCategory === 'Qualifier') ? 'block' : 'none';
+            finalDiv.style.display = (selectedCategory === 'Final') ? 'block' : 'none';
+        }
+
+        // Call it once on page load to set the initial state
+        toggleInputs();
+
+        // Add event listener for when the user changes the selection
+        eventCategorySelect.addEventListener('change', toggleInputs);
+    });
+</script>
 </body>
 </html>
