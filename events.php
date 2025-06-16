@@ -19,6 +19,11 @@ if (isset($_GET['added']) && $_GET['added'] == 1) {
     $message = '<div class="alert alert-success">Race Event created successfully!</div>';
 }
 
+// In events.php, near where you check for 'added' and 'deleted'
+if (isset($_GET['updated']) && $_GET['updated'] == 1) {
+    $message = '<div class="alert alert-success">Race Event updated successfully!</div>';
+}
+
 // --- Handle Add New Event ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add') {
     $event_name = trim($_POST['event_name']);
@@ -126,7 +131,7 @@ $events_list = $stmt_events->fetchAll();
                             </a>
                         </div>
                         <div class="col-md-3 text-end">
-                            <a href="#" class="btn btn-sm btn-outline-secondary disabled">Edit</a>
+                            <a href="edit_event.php?event_id=<?php echo $event['id']; ?>" class="btn btn-sm btn-outline-primary">Edit</a>
                             <form method="POST" style="display:inline-block; margin-left: 5px;" onsubmit="return confirm('WARNING: Deleting this event will also delete ALL associated race logs. This cannot be undone. Are you sure?');">
                                 <input type="hidden" name="action" value="delete_event">
                                 <input type="hidden" name="event_id_to_delete" value="<?php echo $event['id']; ?>">
