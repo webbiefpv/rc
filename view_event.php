@@ -261,7 +261,12 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
             <?php else: ?>
                 <?php foreach ($race_logs as $log): ?>
                     <tr>
-                        <td><strong><?php echo htmlspecialchars($log['event_type']); ?></strong><br><small><?php echo date("g:i a", strtotime($log['race_date'])); ?></small></td>
+                        <td>
+                            <a href="view_log.php?log_id=<?php echo $log['id']; ?>">
+                                <strong><?php echo htmlspecialchars($log['event_type']); ?></strong><br>
+                                <small><?php echo date("g:i a", strtotime($log['race_date'])); ?></small>
+                            </a>
+                        </td>
                         <td><a href="setup_form.php?setup_id=<?php echo $log['setup_id']; ?>"><?php echo htmlspecialchars($log['model_name'] . ' - ' . $log['setup_name']); ?></a></td>
                         <td><?php echo ($log['laps_completed'] ? $log['laps_completed'] . ' / ' . $log['total_race_time'] : 'N/A'); ?></td>
                         <td><?php echo htmlspecialchars($log['best_lap_time'] ?: 'N/A'); ?></td>
