@@ -303,7 +303,7 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
                             <?php if(!empty($log['track_conditions_notes'])) { echo '<br><strong>Track:</strong> ' . nl2br(htmlspecialchars($log['track_conditions_notes'])); } ?>
                         </td>
                         <td>
-                            <a href="#" class="btn btn-sm btn-outline-secondary disabled">Edit</a>
+                            <a href="edit_log.php?log_id=<?php echo $log['id']; ?>" class="btn btn-sm btn-outline-primary">Edit</a>
 
                             <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this log entry?');">
                                 <input type="hidden" name="action" value="delete_log">
