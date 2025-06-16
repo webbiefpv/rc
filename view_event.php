@@ -6,6 +6,14 @@ requireLogin();
 $user_id = $_SESSION['user_id'];
 $message = '';
 
+if (isset($_GET['added']) && $_GET['added'] == 1) {
+    $message = '<div class="alert alert-success">Race log entry added successfully!</div>';
+}
+// ADD THIS NEW CHECK
+if (isset($_GET['deleted']) && $_GET['deleted'] == 1) {
+    $message = '<div class="alert alert-success">Race log entry deleted successfully!</div>';
+}
+
 // Section 1: Get the Event ID from the URL and verify it belongs to the user
 // ==============================================================================
 if (!isset($_GET['event_id'])) {
@@ -103,6 +111,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $message = '<div class="alert alert-danger">An error occurred while saving the log.</div>';
             error_log("Race log insert failed: " . $e->getMessage());
         }
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_log') {
+    $log_id_to_delete = intval($_POST['log_id_to_delete']);
+
+    // Security check: Ensure the log belongs to the user before deleting
+    $stmt_check = $pdo->prepare("SELECT id FROM race_logs WHERE id = ? AND user_id = ?");
+    $stmt_check->execute([$log_id_to_delete, $user_id]);
+    if ($stmt_check->fetch()) {
+        // Log exists and belongs to the user, so proceed with deletion
+        $stmt_delete = $pdo->prepare("DELETE FROM race_logs WHERE id = ?");
+        $stmt_delete->execute([$log_id_to_delete]);
+
+        // Because we used ON DELETE CASCADE when creating the tables,
+        // all related lap times in 'race_lap_times' will be deleted automatically.
+
+        // Redirect back to the same page with a success message
+        header("Location: view_event.php?event_id=" . $event_id . "&deleted=1");
+        exit;
     }
 }
 
@@ -277,7 +303,13 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
                             <?php if(!empty($log['track_conditions_notes'])) { echo '<br><strong>Track:</strong> ' . nl2br(htmlspecialchars($log['track_conditions_notes'])); } ?>
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-outline-secondary" disabled>Edit</button>
+                            <a href="#" class="btn btn-sm btn-outline-secondary disabled">Edit</a>
+
+                            <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this log entry?');">
+                                <input type="hidden" name="action" value="delete_log">
+                                <input type="hidden" name="log_id_to_delete" value="<?php echo $log['id']; ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
                         </td>
                     </tr>
                 <?php endforeach; ?>
