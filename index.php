@@ -200,7 +200,7 @@ require 'header.php'; // Your common header
     </div>
     <div class="row">
     <div class="col-lg-6 mb-4">
-        <div class="card border-primary h-100">
+        <div class="card h-100">
             <div class="card-header">
                 <h5 class="mb-0">Upcoming Event</h5>
             </div>
