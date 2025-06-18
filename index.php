@@ -183,82 +183,81 @@ require 'header.php'; // Your common header
             </div>
         </div>
     </div>
-
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5>Quick Links</h5>
-        </div>
-        <div class="card-body text-center">
-            <a href="models.php" class="btn btn-primary m-1">Manage Models & Setups</a>
-            <a href="tracks.php" class="btn btn-info m-1">Manage Tracks</a>
-            <a href="rollout_calc.php" class="btn btn-success m-1">Roll Out Calculator</a>
-            <a href="compare_setups.php" class="btn btn-warning m-1">Compare Setups</a>
-            <a href="race_log.php" class="btn btn-secondary m-1">Race Log</a>
-            <a href="glossary.php" class="btn btn-light m-1 border">Setup Glossary</a>
-            <a href="troubleshooting.php" class="btn btn-light m-1 border">Troubleshooting</a>
+    <div class="row mb-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Quick Links</h5>
+            </div>
+            <div class="card-body text-center">
+                <a href="models.php" class="btn btn-primary m-1">Manage Models & Setups</a>
+                <a href="tracks.php" class="btn btn-info m-1">Manage Tracks</a>
+                <a href="rollout_calc.php" class="btn btn-success m-1">Roll Out Calculator</a>
+                <a href="compare_setups.php" class="btn btn-warning m-1">Compare Setups</a>
+                <a href="race_log.php" class="btn btn-secondary m-1">Race Log</a>
+                <a href="glossary.php" class="btn btn-light m-1 border">Setup Glossary</a>
+                <a href="troubleshooting.php" class="btn btn-light m-1 border">Troubleshooting</a>
+            </div>
         </div>
     </div>
     <div class="row">
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header">
-                <h5 class="mb-0">Upcoming Event</h5>
-            </div>
-            <div class="card-body d-flex flex-column">
-                <?php if ($upcoming_event): ?>
-                    <h5 class="card-title"><?php echo htmlspecialchars($upcoming_event['event_name']); ?></h5>
-                    <p class="card-text">
-                        <strong>When:</strong> <?php echo date("l, F j, Y", strtotime($upcoming_event['event_date'])); ?><br>
-                        <strong>Track:</strong> <?php echo htmlspecialchars($upcoming_event['track_name']); ?>
-                    </p>
-                    <a href="view_event.php?event_id=<?php echo $upcoming_event['id']; ?>" class="btn btn-outline-primary mt-auto">View Event Details</a>
-                <?php else: ?>
-                    <p class="card-text text-muted">No upcoming events scheduled. Time to create one!</p>
-                    <a href="events.php" class="btn btn-outline-primary mt-auto">Schedule Event</a>
-                <?php endif; ?>
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Upcoming Event</h5>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <?php if ($upcoming_event): ?>
+                        <h5 class="card-title"><?php echo htmlspecialchars($upcoming_event['event_name']); ?></h5>
+                        <p class="card-text">
+                            <strong>When:</strong> <?php echo date("l, F j, Y", strtotime($upcoming_event['event_date'])); ?><br>
+                            <strong>Track:</strong> <?php echo htmlspecialchars($upcoming_event['track_name']); ?>
+                        </p>
+                        <a href="view_event.php?event_id=<?php echo $upcoming_event['id']; ?>" class="btn btn-outline-primary mt-auto">View Event Details</a>
+                    <?php else: ?>
+                        <p class="card-text text-muted">No upcoming events scheduled. Time to create one!</p>
+                        <a href="events.php" class="btn btn-outline-primary mt-auto">Schedule Event</a>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-lg-6 mb-4">
-    <div class="card h-100">
-        <div class="card-header">
-            <h5 class="mb-0">Last Event Summary</h5>
-        </div>
-        <div class="card-body d-flex flex-column">
-            <?php if ($last_event): ?>
-                <h5 class="card-title"><?php echo htmlspecialchars($last_event['event_name']); ?></h5>
-                <p class="card-text"><small class="text-muted">On <?php echo date("F j, Y", strtotime($last_event['event_date'])); ?></small></p>
-                
-                <?php if (!empty($last_event_logs)): ?>
-                    <p class="mb-1">Logged sessions:</p>
-                    <ul class="list-group list-group-flush flex-grow-1">
-                        <?php foreach ($last_event_logs as $log): ?>
-                            <li class="list-group-item">
-                                <a href="view_log.php?log_id=<?php echo $log['id']; ?>">
-                                    <?php echo htmlspecialchars($log['event_type']); ?>
-                                </a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <p class="text-muted">No sessions were logged for this event.</p>
-                <?php endif; ?>
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Last Event Summary</h5>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <?php if ($last_event): ?>
+                        <h5 class="card-title"><?php echo htmlspecialchars($last_event['event_name']); ?></h5>
+                        <p class="card-text"><small class="text-muted">On <?php echo date("F j, Y", strtotime($last_event['event_date'])); ?></small></p>
+                        
+                        <?php if (!empty($last_event_logs)): ?>
+                            <p class="mb-1">Logged sessions:</p>
+                            <ul class="list-group list-group-flush flex-grow-1">
+                                <?php foreach ($last_event_logs as $log): ?>
+                                    <li class="list-group-item">
+                                        <a href="view_log.php?log_id=<?php echo $log['id']; ?>">
+                                            <?php echo htmlspecialchars($log['event_type']); ?>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <p class="text-muted">No sessions were logged for this event.</p>
+                        <?php endif; ?>
 
-                <a href="view_event.php?event_id=<?php echo $last_event['id']; ?>" class="btn btn-outline-primary mt-3">View Full Event</a>
+                        <a href="view_event.php?event_id=<?php echo $last_event['id']; ?>" class="btn btn-outline-primary mt-3">View Full Event</a>
 
-            <?php else: ?>
-                <p class="card-text text-muted">No past events found in your log.</p>
-            <?php endif; ?>
+                    <?php else: ?>
+                        <p class="card-text text-muted">No past events found in your log.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-
-
-<div class="row">
-    <div class="col-lg-6 mb-4">
-        </div>
     <div class="row">
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
@@ -360,7 +359,6 @@ require 'header.php'; // Your common header
             </div>
         </div>
     </div>
-
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
