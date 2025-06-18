@@ -28,6 +28,36 @@ $setups_list = $stmt_setups->fetchAll(PDO::FETCH_ASSOC);
 
 $comparison_results = null; // This will hold our results
 
+$magic_setup_result = null; // This will hold our result
+
+// Check if the "Magic Setup" form has been submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'find_magic_setup') {
+    $track_id_magic = intval($_POST['track_id_magic']);
+
+    if ($track_id_magic) {
+        // This query finds the single best log entry based on the fastest 'best_lap_time' for the selected track
+        $stmt = $pdo->prepare("
+            SELECT 
+                rl.best_lap_time,
+                rl.laps_completed,
+                rl.total_race_time,
+                e.event_name,
+                s.id as setup_id,
+                s.name as setup_name,
+                m.name as model_name
+            FROM race_logs rl
+            JOIN setups s ON rl.setup_id = s.id
+            JOIN models m ON s.model_id = m.id
+            JOIN race_events e ON rl.event_id = e.id
+            WHERE rl.track_id = ? AND rl.user_id = ? AND rl.best_lap_time > 0
+            ORDER BY rl.best_lap_time ASC
+            LIMIT 1
+        ");
+        $stmt->execute([$track_id_magic, $user_id]);
+        $magic_setup_result = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+}
+
 // Check if the comparison form has been submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'compare_setups') {
     $setup_id_1 = intval($_POST['setup_id_1']);
@@ -200,6 +230,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['track_id'])) {
                 </table>
             </div>
         </div>
+    </div>
+    <?php endif; ?>
+</div>
+<div class="card mb-4">
+    <div class="card-header">
+        <h5>"Magic Setup" Finder</h5>
+    </div>
+    <div class="card-body">
+        <p>Select a track to find the setup you used to achieve your single fastest lap time ever recorded there.</p>
+        <form method="POST">
+            <input type="hidden" name="action" value="find_magic_setup">
+            <div class="row align-items-end">
+                <div class="col-md-5">
+                    <label for="track_id_magic" class="form-label">Select a Track:</label>
+                    <select class="form-select" id="track_id_magic" name="track_id_magic" required>
+                        <option value="">-- Choose a track --</option>
+                        <?php foreach ($tracks_list as $track): ?>
+                            <option value="<?php echo $track['id']; ?>">
+                                <?php echo htmlspecialchars($track['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">Find Magic Setup</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <?php if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'find_magic_setup'): ?>
+    <div class="card-footer">
+        <h5>Finder Result</h5>
+        <?php if ($magic_setup_result): ?>
+            <p>Your fastest lap at this track was a <strong><?php echo htmlspecialchars($magic_setup_result['best_lap_time']); ?></strong> during the event "<?php echo htmlspecialchars($magic_setup_result['event_name']); ?>".</p>
+            <p>You were using the following setup:</p>
+            <div class="alert alert-success">
+                <h5 class="alert-heading"><?php echo htmlspecialchars($magic_setup_result['model_name'] . ' - ' . $magic_setup_result['setup_name']); ?></h5>
+                <hr>
+                <a href="setup_form.php?setup_id=<?php echo $magic_setup_result['setup_id']; ?>" class="btn btn-success">View This "Magic" Setup</a>
+            </div>
+        <?php else: ?>
+            <p class="text-muted">No race logs with a best lap time were found for the selected track.</p>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>
