@@ -199,7 +199,7 @@ require 'header.php'; // Your common header
             </div>
         </div>
     </div>
-    <div class="row">
+    <div class="row mb-4">
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
@@ -220,9 +220,7 @@ require 'header.php'; // Your common header
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="row mb-4">
+    
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
