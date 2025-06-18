@@ -6,6 +6,46 @@ requireLogin();
 
 $user_id = $_SESSION['user_id'];
 
+// --- Fetch Last Event Summary ---
+$last_event = null;
+$last_event_logs = [];
+
+// First, find the most recent event that has already passed
+$stmt_last_event = $pdo->prepare("
+    SELECT id, event_name, event_date
+    FROM race_events
+    WHERE user_id = ? AND event_date < CURDATE()
+    ORDER BY event_date DESC
+    LIMIT 1
+");
+$stmt_last_event->execute([$user_id]);
+$last_event = $stmt_last_event->fetch(PDO::FETCH_ASSOC);
+
+// If a last event was found, fetch its associated logs
+if ($last_event) {
+    $stmt_last_event_logs = $pdo->prepare("
+        SELECT id, event_type
+        FROM race_logs
+        WHERE event_id = ?
+        ORDER BY race_date ASC
+    ");
+    $stmt_last_event_logs->execute([$last_event['id']]);
+    $last_event_logs = $stmt_last_event_logs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// --- Fetch Next Upcoming Event ---
+$upcoming_event = null;
+$stmt_upcoming = $pdo->prepare("
+    SELECT e.id, e.event_name, e.event_date, t.name AS track_name
+    FROM race_events e
+    JOIN tracks t ON e.track_id = t.id
+    WHERE e.user_id = ? AND e.event_date >= CURDATE()
+    ORDER BY e.event_date ASC
+    LIMIT 1
+");
+$stmt_upcoming->execute([$user_id]);
+$upcoming_event = $stmt_upcoming->fetch(PDO::FETCH_ASSOC);
+
 // --- Dashboard Stats ---
 // Count Models
 $stmt_models_count = $pdo->prepare("SELECT COUNT(*) FROM models WHERE user_id = ?");
@@ -158,7 +198,67 @@ require 'header.php'; // Your common header
             <a href="troubleshooting.php" class="btn btn-light m-1 border">Troubleshooting</a>
         </div>
     </div>
+    <div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card border-primary h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">📅 Upcoming Event</h5>
+            </div>
+            <div class="card-body d-flex flex-column">
+                <?php if ($upcoming_event): ?>
+                    <h5 class="card-title"><?php echo htmlspecialchars($upcoming_event['event_name']); ?></h5>
+                    <p class="card-text">
+                        <strong>When:</strong> <?php echo date("l, F j, Y", strtotime($upcoming_event['event_date'])); ?><br>
+                        <strong>Track:</strong> <?php echo htmlspecialchars($upcoming_event['track_name']); ?>
+                    </p>
+                    <a href="view_event.php?event_id=<?php echo $upcoming_event['id']; ?>" class="btn btn-primary mt-auto">View Event Details</a>
+                <?php else: ?>
+                    <p class="card-text text-muted">No upcoming events scheduled. Time to create one!</p>
+                    <a href="events.php" class="btn btn-primary mt-auto">Schedule Event</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
 
+    <div class="col-lg-6 mb-4">
+    <div class="card h-100">
+        <div class="card-header">
+            <h5 class="mb-0">🏁 Last Event Summary</h5>
+        </div>
+        <div class="card-body d-flex flex-column">
+            <?php if ($last_event): ?>
+                <h5 class="card-title"><?php echo htmlspecialchars($last_event['event_name']); ?></h5>
+                <p class="card-text"><small class="text-muted">On <?php echo date("F j, Y", strtotime($last_event['event_date'])); ?></small></p>
+                
+                <?php if (!empty($last_event_logs)): ?>
+                    <p class="mb-1">Logged sessions:</p>
+                    <ul class="list-group list-group-flush flex-grow-1">
+                        <?php foreach ($last_event_logs as $log): ?>
+                            <li class="list-group-item">
+                                <a href="view_log.php?log_id=<?php echo $log['id']; ?>">
+                                    <?php echo htmlspecialchars($log['event_type']); ?>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="text-muted">No sessions were logged for this event.</p>
+                <?php endif; ?>
+
+                <a href="view_event.php?event_id=<?php echo $last_event['id']; ?>" class="btn btn-outline-primary mt-3">View Full Event</a>
+
+            <?php else: ?>
+                <p class="card-text text-muted">No past events found in your log.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        </div>
     <div class="row">
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
