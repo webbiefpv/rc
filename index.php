@@ -211,10 +211,10 @@ require 'header.php'; // Your common header
                         <strong>When:</strong> <?php echo date("l, F j, Y", strtotime($upcoming_event['event_date'])); ?><br>
                         <strong>Track:</strong> <?php echo htmlspecialchars($upcoming_event['track_name']); ?>
                     </p>
-                    <a href="view_event.php?event_id=<?php echo $upcoming_event['id']; ?>" class="btn btn-primary mt-auto">View Event Details</a>
+                    <a href="view_event.php?event_id=<?php echo $upcoming_event['id']; ?>" class="btn btn-outline-primary mt-auto">View Event Details</a>
                 <?php else: ?>
                     <p class="card-text text-muted">No upcoming events scheduled. Time to create one!</p>
-                    <a href="events.php" class="btn btn-primary mt-auto">Schedule Event</a>
+                    <a href="events.php" class="btn btn-outline-primary mt-auto">Schedule Event</a>
                 <?php endif; ?>
             </div>
         </div>
