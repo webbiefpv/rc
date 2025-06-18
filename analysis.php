@@ -246,7 +246,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["track_id"])) {
                 </div>
             </form>
         </div>
-        <div class="card mb-4">
+        
+
+
+
+</div>
+<div class="card mb-4">
     <div class="card-header">
         <h5>Head-to-Head Setup Comparison</h5>
     </div>
@@ -310,7 +315,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["track_id"])) {
     </div>
     <?php endif; ?>
 </div>
-
 <div class="card mb-4">
     <div class="card-header">
         <h5>Lap Consistency Report</h5>
@@ -367,9 +371,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["track_id"])) {
     </div>
     <?php endif; ?>
 </div>
-
-</div>
-
 <div class="card mb-4">
     <div class="card-header">
         <h5>"Magic Setup" Finder</h5>
