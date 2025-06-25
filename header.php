@@ -36,7 +36,7 @@
 			</ul>
 			<ul class="navbar-nav">
 				<li class="nav-item">
-					<a class="nav-link" href="change_password.php">Change Password</a>
+    				<a class="nav-link" href="profile.php">Profile</a>
 				</li>
 				<li class="nav-item">
 					<a class="nav-link" href="logout.php">Logout</a>
