@@ -114,4 +114,59 @@ if ($selected_model_id) {
         <div class="card-header">
             <h5>Add New Maintenance Entry</h5>
         </div>
-        <div
+        <div class="card-body">
+            <form method="POST">
+                <input type="hidden" name="action" value="add_log">
+                <input type="hidden" name="model_id" value="<?php echo $selected_model_id; ?>">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="log_date" class="form-label">Date of Maintenance</label>
+                        <input type="date" class="form-control" id="log_date" name="log_date" value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    <div class="col-md-8">
+                        <label for="activity_description" class="form-label">Activity / Part Replaced</label>
+                        <input type="text" class="form-control" id="activity_description" name="activity_description" placeholder="e.g., Rebuilt motor, replaced side springs" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="e.g., Brushes were worn, springs had lost tension..."></textarea>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Save Log Entry</button>
+            </form>
+        </div>
+    </div>
+
+    <h3>Logged Activities</h3>
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Activity</th>
+                <th>Notes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($maintenance_logs)): ?>
+                <tr><td colspan="4" class="text-center">No maintenance logged for this model yet.</td></tr>
+            <?php else: ?>
+                <?php foreach ($maintenance_logs as $log): ?>
+                    <tr>
+                        <td><?php echo date("M j, Y", strtotime($log['log_date'])); ?></td>
+                        <td><?php echo htmlspecialchars($log['activity_description']); ?></td>
+                        <td><?php echo nl2br(htmlspecialchars($log['notes'])); ?></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary" disabled>Edit</button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
