@@ -22,6 +22,9 @@
     				<a class="nav-link" href="analysis.php">Analysis</a>
 				</li>
 				<li class="nav-item">
+    				<a class="nav-link" href="maintenance.php">Maintenance</a>
+				</li>
+				<li class="nav-item">
 					<a class="nav-link" href="glossary.php">On-Road Setup Glossary</a>
 				</li>
 				<li class="nav-item">
