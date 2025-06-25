@@ -39,6 +39,9 @@
     				<a class="nav-link" href="profile.php">Profile</a>
 				</li>
 				<li class="nav-item">
+    				<a class="nav-link" href="options.php">Options</a>
+				</li>
+				<li class="nav-item">
 					<a class="nav-link" href="logout.php">Logout</a>
 				</li>
 			</ul>

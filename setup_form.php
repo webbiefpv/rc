@@ -15,6 +15,44 @@ if (!$setup || $setup['user_id'] != $user_id) {
 	exit;
 }
 
+// --- Fetch all user-defined options for the dropdowns ---
+$stmt_options = $pdo->prepare("SELECT option_category, option_value FROM user_options WHERE user_id = ? ORDER BY option_value");
+$stmt_options->execute([$user_id]);
+$all_options_raw = $stmt_options->fetchAll(PDO::FETCH_ASSOC);
+
+// Group the options by category so they are easy to use in the form
+$options_by_category = [];
+foreach ($all_options_raw as $option) {
+    $options_by_category[$option['option_category']][] = $option['option_value'];
+}
+
+// Helper function to generate a dropdown for a setup sheet field
+function createOptionDropdown($name, $label, $options_list, $saved_value) {
+    echo '<div class="col-md-4 mb-3">';
+    echo '<label for="' . $name . '" class="form-label">' . $label . '</label>';
+    echo '<select class="form-select" id="' . $name . '" name="' . $name . '">';
+    
+    // Add an empty default option
+    echo '<option value="">-- Select --</option>';
+
+    // Add the list of predefined options
+    if (!empty($options_list)) {
+        foreach ($options_list as $option) {
+            $selected = ($option == $saved_value) ? 'selected' : '';
+            echo '<option value="' . htmlspecialchars($option) . '" ' . $selected . '>' . htmlspecialchars($option) . '</option>';
+        }
+    }
+
+    // IMPORTANT: If the saved value is not in the predefined list, add it as a selected option.
+    // This handles old entries or one-off custom values.
+    if (!empty($saved_value) && (empty($options_list) || !in_array($saved_value, $options_list))) {
+        echo '<option value="' . htmlspecialchars($saved_value) . '" selected>CUSTOM: ' . htmlspecialchars($saved_value) . '</option>';
+    }
+
+    echo '</select>';
+    echo '</div>';
+}
+
 // Verify Current setup
 $stmt_get_selected_id = $pdo->prepare("SELECT selected_setup_id FROM users WHERE id = ?");
 $stmt_get_selected_id->execute([$user_id]);
@@ -470,14 +508,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
         <!-- Electronics -->
         <h3>Electronics</h3>
         <div class="row">
-			<?php
-			$fields = ['battery', 'battery_c_rating', 'battery_brand', 'capacity', 'model', 'esc_brand', 'esc_model', 'motor_kv_constant', 'motor_brand', 'motor_model', 'motor_timing', 'motor_wind', 'radio_brand', 'radio_model', 'receiver_model', 'servo_brand', 'servo_model', 'transponder_id'];
-			foreach ($fields as $field): ?>
+            <?php
+            // --- Now we call our new helper function for the dropdowns ---
+            createOptionDropdown('electronics[battery_brand]', 'Battery Brand', $options_by_category['battery_brand'] ?? [], $data['electronics']['battery_brand'] ?? null);
+            createOptionDropdown('electronics[esc_brand]', 'ESC Brand', $options_by_category['esc_brand'] ?? [], $data['electronics']['esc_brand'] ?? null);
+            createOptionDropdown('electronics[motor_brand]', 'Motor Brand', $options_by_category['motor_brand'] ?? [], $data['electronics']['motor_brand'] ?? null);
+            createOptionDropdown('electronics[radio_brand]', 'Radio Brand', $options_by_category['radio_brand'] ?? [], $data['electronics']['radio_brand'] ?? null);
+            createOptionDropdown('electronics[servo_brand]', 'Servo Brand', $options_by_category['servo_brand'] ?? [], $data['electronics']['servo_brand'] ?? null);
+
+            // --- These fields will remain as text inputs ---
+            $text_fields = ['battery', 'battery_c_rating', 'capacity', 'model', 'esc_model', 'motor_kv_constant', 'motor_model', 'motor_timing', 'motor_wind', 'radio_model', 'receiver_model', 'transponder_id'];
+            foreach ($text_fields as $field):
+            ?>
                 <div class="col-md-4 mb-3">
                     <label for="electronics_<?php echo $field; ?>" class="form-label"><?php echo ucwords(str_replace('_', ' ', $field)); ?></label>
                     <input type="text" class="form-control" id="electronics_<?php echo $field; ?>" name="electronics[<?php echo $field; ?>]" value="<?php echo htmlspecialchars($data['electronics'][$field] ?? ''); ?>">
                 </div>
-			<?php endforeach; ?>
+            <?php endforeach; ?>
+
             <div class="col-12 mb-3">
                 <label for="electronics_charging_notes" class="form-label">Charging Notes</label>
                 <textarea class="form-control" id="electronics_charging_notes" name="electronics[charging_notes]"><?php echo htmlspecialchars($data['electronics']['charging_notes'] ?? ''); ?></textarea>
