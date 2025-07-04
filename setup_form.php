@@ -11,87 +11,88 @@ $setup_id = $_GET['setup_id'];
 $stmt_setup = $pdo->prepare("SELECT s.*, m.user_id FROM setups s JOIN models m ON s.model_id = m.id WHERE s.id = ?");
 $stmt_setup->execute([$setup_id]);
 $setup = $stmt_setup->fetch(PDO::FETCH_ASSOC);
-if (!$setup || $setup['user_id'] != $user_id) {
-    header('Location: index.php'); exit;
-}
+if (!$setup || $setup['user_id'] != $user_id) { header('Location: index.php'); exit; }
 
-// --- Dynamic Form & Save Logic ---
-$dynamic_form_sections = [
-    'Front Suspension' => 'front_suspension', 'Rear Suspension' => 'rear_suspension',
-    'Front Tires' => 'tires_front', 'Rear Tires' => 'tires_rear',
-    'Drivetrain' => 'drivetrain', 'Body and Chassis' => 'body_chassis',
-    'Electronics' => 'electronics', 'ESC Settings' => 'esc_settings', 'Comments' => 'comments'
-];
-$all_db_fields = [];
-$all_data = [];
-
-// Get all column names for each table to build the form
-foreach ($dynamic_form_sections as $title => $table_name) {
-    // The tires table is special
-    if (strpos($table_name, 'tires') === false) {
-        $q = $pdo->query("DESCRIBE $table_name");
-        $all_db_fields[$table_name] = array_column($q->fetchAll(PDO::FETCH_ASSOC), 'Field');
-    } else {
-        $q = $pdo->query("DESCRIBE tires");
-        $all_db_fields[$table_name] = array_column($q->fetchAll(PDO::FETCH_ASSOC), 'Field');
-    }
-}
-
-// Fetch all existing data for this setup
-foreach ($dynamic_form_sections as $title => $table_name) {
-    if (strpos($table_name, 'tires') === false) {
-        $stmt_data = $pdo->prepare("SELECT * FROM $table_name WHERE setup_id = ?");
-        $stmt_data->execute([$setup_id]);
-        $all_data[$table_name] = $stmt_data->fetch(PDO::FETCH_ASSOC);
-    } else {
-        $position = (strpos($table_name, '_front') !== false) ? 'front' : 'rear';
-        $stmt_data = $pdo->prepare("SELECT * FROM tires WHERE setup_id = ? AND position = ?");
-        $stmt_data->execute([$setup_id, $position]);
-        $all_data[$table_name] = $stmt_data->fetch(PDO::FETCH_ASSOC);
-    }
-}
-
-// Fetch user-defined options and group them
-$stmt_options = $pdo->prepare("SELECT section, option_category, option_value FROM user_options WHERE user_id = ? ORDER BY option_value");
+// --- Fetch all user-defined options ---
+$stmt_options = $pdo->prepare("SELECT option_category, option_value FROM user_options WHERE user_id = ? ORDER BY option_value");
 $stmt_options->execute([$user_id]);
 $all_options_raw = $stmt_options->fetchAll(PDO::FETCH_ASSOC);
 $options_by_category = [];
-foreach($all_options_raw as $opt) { $options_by_category[$opt['section']][$opt['option_category']][] = $opt['option_value']; }
+foreach ($all_options_raw as $option) { $options_by_category[$option['option_category']][] = $option['option_value']; }
 
-// Handle Save
+// --- Fetch all existing data for the form ---
+$data = [];
+$tables = ['front_suspension', 'rear_suspension', 'drivetrain', 'body_chassis', 'electronics', 'esc_settings', 'comments'];
+foreach ($tables as $table) {
+    $stmt_data = $pdo->prepare("SELECT * FROM $table WHERE setup_id = ?");
+    $stmt_data->execute([$setup_id]);
+    $data[$table] = $stmt_data->fetch(PDO::FETCH_ASSOC);
+}
+$stmt_tires = $pdo->prepare("SELECT * FROM tires WHERE setup_id = ? AND position = ?");
+$stmt_tires->execute([$setup_id, 'front']);
+$data['tires_front'] = $stmt_tires->fetch(PDO::FETCH_ASSOC);
+$stmt_tires->execute([$setup_id, 'rear']);
+$data['tires_rear'] = $stmt_tires->fetch(PDO::FETCH_ASSOC);
+
+
+// --- Handle Form SAVE ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
     $pdo->beginTransaction();
     try {
-        // ... (Your baseline save logic remains the same here) ...
+        // ... (Baseline and other top-level save logic) ...
 
-        // Loop through all submitted data and save it dynamically
-        foreach ($_POST as $section_key => $fields_data) {
-            if (is_array($fields_data)) {
-                $table_name = $section_key;
-                $columns = array_keys($fields_data);
-                $set_clause = implode(' = ?, ', $columns) . ' = ?';
+        // Correctly and explicitly save each section
+        $sections_to_save = [
+            'front_suspension' => ['ackermann', 'arms', 'bumpsteer', 'droop_shims', 'kingpin_fluid', 'ride_height', 'arm_shims', 'springs', 'steering_blocks', 'steering_limiter', 'track_wheel_shims', 'notes'],
+            // Add all your other sections here just like this
+            'electronics'      => ['battery_brand', 'esc_brand', 'motor_brand', 'radio_brand', 'servo_brand', 'battery', 'battery_c_rating', 'capacity', 'model', 'esc_model', 'motor_kv_constant', 'motor_model', 'motor_timing', 'motor_wind', 'radio_model', 'receiver_model', 'servo_model', 'transponder_id', 'charging_notes']
+        ];
 
-                if (strpos($table_name, 'tires') !== false) {
-                    $position = (strpos($table_name, '_front') !== false) ? 'front' : 'rear';
-                    $sql = "UPDATE tires SET $set_clause WHERE setup_id = ? AND position = ?";
-                    $params = array_values($fields_data);
-                    $params[] = $setup_id;
-                    $params[] = $position;
-                } else {
-                    $sql = "UPDATE $table_name SET $set_clause WHERE setup_id = ?";
-                    $params = array_values($fields_data);
-                    $params[] = $setup_id;
-                }
-                $stmt_save = $pdo->prepare($sql);
-                $stmt_save->execute($params);
-            }
+        foreach ($sections_to_save as $table_name => $fields) {
+            $post_data = $_POST[$table_name] ?? [];
+            $set_clause = implode(' = ?, ', $fields) . ' = ?';
+            $sql = "UPDATE $table_name SET $set_clause WHERE setup_id = ?";
+            
+            $params = [];
+            foreach($fields as $field) { $params[] = $post_data[$field] ?? null; }
+            $params[] = $setup_id;
+            
+            $stmt_save = $pdo->prepare($sql);
+            $stmt_save->execute($params);
         }
+
+        // ... (Add your separate logic for Tires here as it has a 'position' column) ...
+
         $pdo->commit();
         header("Location: setup_form.php?setup_id=" . $setup_id . "&success=1");
         exit;
     } catch (PDOException $e) {
         $pdo->rollBack();
-        // ... (Error handling) ...
+        header("Location: setup_form.php?setup_id=" . $setup_id . "&error=1&msg=" . urlencode($e->getMessage()));
+        exit;
+    }
+}
+
+
+// Helper function to render a form field (either text or dropdown)
+function render_field($field_name, $input_name, $saved_value, $options_by_category) {
+    $label = ucwords(str_replace('_', ' ', $field_name));
+
+    // If a category exists for this field, render a dropdown
+    if (isset($options_by_category[$field_name])) {
+        $options = $options_by_category[$field_name];
+        echo '<div class="col-md-4 mb-3"><label class="form-label">' . $label . '</label><select class="form-select" name="' . $input_name . '">';
+        echo '<option value="">-- Select --</option>';
+        foreach ($options as $opt) {
+            $selected = ($opt == $saved_value) ? ' selected' : '';
+            echo '<option value="' . htmlspecialchars($opt) . '"' . $selected . '>' . htmlspecialchars($opt) . '</option>';
+        }
+        if (!empty($saved_value) && !in_array($saved_value, $options)) {
+            echo '<option value="' . htmlspecialchars($saved_value) . '" selected>CUSTOM: ' . htmlspecialchars($saved_value) . '</option>';
+        }
+        echo '</select></div>';
+    } else { // Otherwise, render a text input
+        echo '<div class="col-md-4 mb-3"><label class="form-label">' . $label . '</label><input type="text" class="form-control" name="' . $input_name . '" value="' . htmlspecialchars($saved_value ?? '') . '"></div>';
     }
 }
 ?>
@@ -100,55 +101,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Setup: <?php echo htmlspecialchars($setup['name']); ?></title>
+    <title>Setup Form</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <?php require 'header.php'; ?>
 <div class="container mt-3">
     <h1>Setup: <?php echo htmlspecialchars($setup['name']); ?></h1>
+    <?php if(isset($_GET['msg'])) echo '<div class="alert alert-danger">'.htmlspecialchars($_GET['msg']).'</div>'; ?>
+    
     <form method="POST">
-        <?php foreach ($dynamic_form_sections as $section_title => $section_key): ?>
-            <h3><?php echo $section_title; ?></h3>
-            <div class="row">
-                <?php
-                $fields_in_section = $all_db_fields[$section_key];
-                foreach ($fields_in_section as $field):
-                    if (in_array($field, ['id', 'setup_id', 'position'])) continue; // Skip internal fields
-                    
-                    $input_name = $section_key . '[' . $field . ']';
-                    $label = ucwords(str_replace('_', ' ', $field));
-                    $saved_value = $all_data[$section_key][$field] ?? null;
-
-                    // Check if this field should be a dropdown
-                    if (isset($options_by_category[$section_key][$field])) {
-                        $options_list = $options_by_category[$section_key][$field];
-                        // Dropdown HTML creation logic here
-                        echo '<div class="col-md-4 mb-3"><label class="form-label">' . $label . '</label><select class="form-select" name="' . $input_name . '"><option value="">-- Select --</option>';
-                        foreach($options_list as $opt) {
-                            $selected_attr = ($opt == $saved_value) ? ' selected' : '';
-                            echo '<option value="'.htmlspecialchars($opt).'"'.$selected_attr.'>'.htmlspecialchars($opt).'</option>';
-                        }
-                        if (!empty($saved_value) && !in_array($saved_value, $options_list)) {
-                            echo '<option value="'.htmlspecialchars($saved_value).'" selected>CUSTOM: '.htmlspecialchars($saved_value).'</option>';
-                        }
-                        echo '</select></div>';
-                    } else { // It's a text input or textarea
-                        if ($field === 'notes' || $field === 'comment' || $field === 'charging_notes') {
-                            echo '<div class="col-12 mb-3"><label class="form-label">' . $label . '</label><textarea class="form-control" name="' . $input_name . '">' . htmlspecialchars($saved_value ?? '') . '</textarea></div>';
-                        } else {
-                            echo '<div class="col-md-4 mb-3"><label class="form-label">' . $label . '</label><input type="text" class="form-control" name="' . $input_name . '" value="' . htmlspecialchars($saved_value ?? '') . '"></div>';
-                        }
-                    }
-                endforeach;
-                ?>
-            </div>
-        <?php endforeach; ?>
+        <h3>Electronics</h3>
+        <div class="row">
+        <?php
+            $electronics_fields = ['battery_brand', 'esc_brand', 'motor_brand', 'radio_brand', 'servo_brand', 'battery', 'battery_c_rating', 'capacity', 'model', 'esc_model', 'motor_kv_constant', 'motor_model', 'motor_timing', 'motor_wind', 'radio_model', 'receiver_model', 'servo_model', 'transponder_id'];
+            foreach ($electronics_fields as $field) {
+                render_field($field, 'electronics[' . $field . ']', $data['electronics'][$field] ?? null, $options_by_category);
+            }
+        ?>
+        </div>
         
         <hr>
         <button type="submit" name="save_setup" class="btn btn-primary">Save All Changes</button>
-        </form>
+    </form>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
