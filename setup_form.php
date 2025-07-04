@@ -63,7 +63,7 @@ $dynamic_dropdown_categories = array_keys($options_by_category);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
     $pdo->beginTransaction();
     try {
-        // --- Your existing logic to handle baseline and other top-level settings ---
+        // --- Handle Baseline Setting ---
         $is_baseline = isset($_POST['is_baseline']) ? 1 : 0;
         $model_id = $setup['model_id'];
         if ($is_baseline == 1) {
@@ -72,40 +72,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
         }
         $stmt_update_baseline = $pdo->prepare("UPDATE setups SET is_baseline = ? WHERE id = ?");
         $stmt_update_baseline->execute([$is_baseline, $setup_id]);
+
+        // --- Master structure of the form to loop through for saving ---
+        $form_structure = [
+            'front_suspension' => ['ackermann', 'arms', 'bumpsteer', 'droop_shims', 'kingpin_fluid', 'ride_height', 'arm_shims', 'springs', 'steering_blocks', 'steering_limiter', 'track_wheel_shims', 'notes'],
+            'rear_suspension'  => ['axle_height', 'centre_pivot_ball', 'centre_pivot_fluid', 'droop', 'rear_pod_shims', 'rear_spring', 'ride_height', 'side_bands_lr', 'notes'],
+            'drivetrain'       => ['axle_type', 'drive_ratio', 'gear_pitch', 'rollout', 'spur'],
+            'body_chassis'     => ['battery_position', 'body', 'body_mounting', 'chassis', 'electronics_layout', 'motor_position', 'motor_shims', 'rear_wing', 'screw_turn_buckles', 'servo_position', 'weight_balance_fr', 'weight_total', 'weights'],
+            'electronics'      => ['battery_brand', 'esc_brand', 'motor_brand', 'radio_brand', 'servo_brand', 'battery', 'battery_c_rating', 'capacity', 'model', 'esc_model', 'motor_kv_constant', 'motor_model', 'motor_timing', 'motor_wind', 'radio_model', 'receiver_model', 'servo_model', 'transponder_id', 'charging_notes'],
+            'esc_settings'     => ['boost_activation', 'boost_rpm_end', 'boost_rpm_start', 'boost_ramp', 'boost_timing', 'brake_curve', 'brake_drag', 'brake_frequency', 'brake_initial_strength', 'race_mode', 'throttle_curve', 'throttle_frequency', 'throttle_initial_strength', 'throttle_neutral_range', 'throttle_strength', 'turbo_activation_method', 'turbo_delay', 'turbo_ramp', 'turbo_timing'],
+            'comments'         => ['comment']
+        ];
         
-        // --- Logic to save all form fields ---
-        // (This is the same save logic you had before, it works with both text fields and dropdowns)
-        
-        // Front Suspension
-        $front_suspension = $_POST['front_suspension'] ?? [];
-        if ($data['front_suspension']) {
-            $stmt = $pdo->prepare("UPDATE front_suspension SET ackermann = ?, arms = ?, bumpsteer = ?, droop_shims = ?, kingpin_fluid = ?, ride_height = ?, arm_shims = ?, springs = ?, steering_blocks = ?, steering_limiter = ?, track_wheel_shims = ?, notes = ? WHERE setup_id = ?");
-            $stmt->execute(array_values($front_suspension) + [$setup_id]);
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO front_suspension (setup_id, ackermann, arms, bumpsteer, droop_shims, kingpin_fluid, ride_height, arm_shims, springs, steering_blocks, steering_limiter, track_wheel_shims, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$setup_id] + array_values($front_suspension));
-        }
-        
-        // ... Repeat this save pattern for all other sections (Rear Suspension, Tires, etc.) ...
-        // The save logic does not need to change because the `name` attributes of the inputs are the same.
-        
-        // Example for Tires (Front)
-        $tires_front = $_POST['tires_front'] ?? [];
-        if ($data['tires_front']) {
-           $stmt = $pdo->prepare("UPDATE tires SET tire_brand = ?, tire_compound = ?, wheel_brand_type = ?, tire_additive = ?, tire_additive_area = ?, tire_additive_time = ?, tire_diameter = ?, tire_side_wall_glue = ? WHERE setup_id = ? AND position = 'front'");
-           $stmt->execute(array_values($tires_front) + [$setup_id]);
-        } else {
-           $stmt = $pdo->prepare("INSERT INTO tires (setup_id, position, tire_brand, tire_compound, wheel_brand_type, tire_additive, tire_additive_area, tire_additive_time, tire_diameter, tire_side_wall_glue) VALUES (?, 'front', ?, ?, ?, ?, ?, ?, ?, ?)");
-           $stmt->execute([$setup_id] + array_values($tires_front));
+        // Loop through and save each section EXCEPT the special 'tires' case
+        foreach ($form_structure as $table_name => $fields) {
+            $post_data = $_POST[$table_name] ?? [];
+            $params = [];
+            foreach ($fields as $field) {
+                $params[$field] = $post_data[$field] ?? null;
+            }
+
+            if ($data[$table_name]) { // UPDATE existing record
+                $set_clause = implode(' = ?, ', $fields) . ' = ?';
+                $sql = "UPDATE $table_name SET $set_clause WHERE setup_id = ?";
+                $execute_params = array_values($params);
+                $execute_params[] = $setup_id;
+            } else { // INSERT new record
+                $cols = implode(', ', $fields);
+                $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+                $sql = "INSERT INTO $table_name (setup_id, $cols) VALUES (?, $placeholders)";
+                $execute_params = array_merge([$setup_id], array_values($params));
+            }
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($execute_params);
         }
 
-        // ... etc for all other sections ...
+        // --- Special handling for TIRES (front and rear) ---
+        $tire_fields = ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
+        
+        // Front Tires
+        $front_tires_post = $_POST['tires_front'] ?? [];
+        $front_params = [];
+        foreach($tire_fields as $field) { $front_params[] = $front_tires_post[$field] ?? null; }
+        
+        if ($data['tires_front']) {
+            $stmt_front = $pdo->prepare("UPDATE tires SET tire_brand = ?, tire_compound = ?, wheel_brand_type = ?, tire_additive = ?, tire_additive_area = ?, tire_additive_time = ?, tire_diameter = ?, tire_side_wall_glue = ? WHERE setup_id = ? AND position = 'front'");
+            $front_params[] = $setup_id;
+            $stmt_front->execute($front_params);
+        } else {
+            $stmt_front = $pdo->prepare("INSERT INTO tires (setup_id, position, tire_brand, tire_compound, wheel_brand_type, tire_additive, tire_additive_area, tire_additive_time, tire_diameter, tire_side_wall_glue) VALUES (?, 'front', ?, ?, ?, ?, ?, ?, ?, ?)");
+            $execute_params = array_merge([$setup_id], $front_params);
+            $stmt_front->execute($execute_params);
+        }
+        
+        // Rear Tires
+        $rear_tires_post = $_POST['tires_rear'] ?? [];
+        $rear_params = [];
+        foreach($tire_fields as $field) { $rear_params[] = $rear_tires_post[$field] ?? null; }
+
+        if ($data['tires_rear']) {
+            $stmt_rear = $pdo->prepare("UPDATE tires SET tire_brand = ?, tire_compound = ?, wheel_brand_type = ?, tire_additive = ?, tire_additive_area = ?, tire_additive_time = ?, tire_diameter = ?, tire_side_wall_glue = ? WHERE setup_id = ? AND position = 'rear'");
+            $rear_params[] = $setup_id;
+            $stmt_rear->execute($rear_params);
+        } else {
+            $stmt_rear = $pdo->prepare("INSERT INTO tires (setup_id, position, tire_brand, tire_compound, wheel_brand_type, tire_additive, tire_additive_area, tire_additive_time, tire_diameter, tire_side_wall_glue) VALUES (?, 'rear', ?, ?, ?, ?, ?, ?, ?, ?)");
+            $execute_params = array_merge([$setup_id], $rear_params);
+            $stmt_rear->execute($execute_params);
+        }
         
         $pdo->commit();
         header("Location: setup_form.php?setup_id=" . $setup_id . "&success=1");
         exit;
+
     } catch (PDOException $e) {
         $pdo->rollBack();
+        // Construct an error message that includes the actual DB error for debugging
+        $error_details = $e->getMessage();
+        $_SESSION['error_message'] = "Database Error: " . $error_details;
         header("Location: setup_form.php?setup_id=" . $setup_id . "&error=1");
         exit;
     }
