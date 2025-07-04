@@ -458,25 +458,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
         <!-- Tires (Front) -->
         <h3>Front Tires</h3>
         <div class="row">
-			<?php
-			$fields = ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
-			foreach ($fields as $field): ?>
+            <?php
+            // Use the helper function for the brand dropdown
+            createOptionDropdown('tires_front[tire_brand]', 'Tire Brand', $options_by_category['tire_brand'] ?? [], $data['tires_front']['tire_brand'] ?? null);
+            
+            // These fields remain as standard text inputs
+            $front_tire_fields = ['tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
+            foreach ($front_tire_fields as $field):
+            ?>
                 <div class="col-md-4 mb-3">
                     <label for="tires_front_<?php echo $field; ?>" class="form-label"><?php echo ucwords(str_replace('_', ' ', $field)); ?></label>
                     <input type="text" class="form-control" id="tires_front_<?php echo $field; ?>" name="tires_front[<?php echo $field; ?>]" value="<?php echo htmlspecialchars($data['tires_front'][$field] ?? ''); ?>">
                 </div>
-			<?php endforeach; ?>
+            <?php endforeach; ?>
         </div>
 
-        <!-- Tires (Rear) -->
         <h3>Rear Tires</h3>
         <div class="row">
-			<?php foreach ($fields as $field): ?>
+            <?php
+            // Use the helper function for the brand dropdown
+            createOptionDropdown('tires_rear[tire_brand]', 'Tire Brand', $options_by_category['tire_brand'] ?? [], $data['tires_rear']['tire_brand'] ?? null);
+
+            // These fields remain as standard text inputs
+            $rear_tire_fields = ['tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
+            foreach ($rear_tire_fields as $field):
+            ?>
                 <div class="col-md-4 mb-3">
                     <label for="tires_rear_<?php echo $field; ?>" class="form-label"><?php echo ucwords(str_replace('_', ' ', $field)); ?></label>
                     <input type="text" class="form-control" id="tires_rear_<?php echo $field; ?>" name="tires_rear[<?php echo $field; ?>]" value="<?php echo htmlspecialchars($data['tires_rear'][$field] ?? ''); ?>">
                 </div>
-			<?php endforeach; ?>
+            <?php endforeach; ?>
         </div>
 
         <!-- Drivetrain -->
