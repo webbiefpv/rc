@@ -13,7 +13,13 @@
 					<a class="nav-link" href="models.php">Setups</a>
 				</li>
 				<li class="nav-item">
+					<a class="nav-link" href="setup_sheets_list.php">Setup Sheets</a>
+				</li>
+				<li class="nav-item">
 					<a class="nav-link" href="rollout_calc.php">Roll Out</a>
+				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="rweight_dist_calc.php">Weight Calculator</a>
 				</li>
 				<li class="nav-item">
     				<a class="nav-link" href="events.php">Race Events</a>
@@ -24,10 +30,6 @@
 				<li class="nav-item">
     				<a class="nav-link" href="maintenance.php">Maintenance</a>
 				</li>
-				<li class="nav-item">
-					<a class="nav-link" href="maintenance.php">Maintenance</a>
-				</li>
-
 				<li class="nav-item">
 					<a class="nav-link" href="tires.php">Tires</a>
 				</li>
