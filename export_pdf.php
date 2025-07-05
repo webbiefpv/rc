@@ -42,7 +42,7 @@ class MYPDF extends TCPDF {
         // --- THIS IS THE CHANGE ---
         // Set the Y position to 15mm from the top of the page.
         // The default is ~10mm. Increase this value to move the header further down.
-        $this->SetY(15);
+        $this->SetY(7);
         
         $this->SetFont('helvetica', 'B', 16);
         $this->Cell(0, 15, 'RC Car Setup Sheet', 0, false, 'C', 0, '', 0, false, 'M', 'M');
