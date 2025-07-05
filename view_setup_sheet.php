@@ -54,14 +54,31 @@ $stmt_weights = $pdo->prepare("SELECT * FROM weight_distribution WHERE setup_id 
 $stmt_weights->execute([$setup_id]);
 $data['weights'] = $stmt_weights->fetch(PDO::FETCH_ASSOC);
 
-// --- MODIFIED QUERY ---
-// Find the entire race log entry where the best lap was achieved with this setup
+// --- NEW: Calculate weight percentages if data exists ---
+$data['weight_calcs'] = null;
+if ($data['weights']) {
+    $lf = floatval($data['weights']['lf_weight']);
+    $rf = floatval($data['weights']['rf_weight']);
+    $lr = floatval($data['weights']['lr_weight']);
+    $rr = floatval($data['weights']['rr_weight']);
+    
+    $total = $lf + $rf + $lr + $rr;
+    if ($total > 0) {
+        $data['weight_calcs'] = [
+            'total' => $total,
+            'front_perc' => (($lf + $rf) / $total) * 100,
+            'rear_perc' => (($lr + $rr) / $total) * 100,
+            'left_perc' => (($lf + $lr) / $total) * 100,
+            'right_perc' => (($rf + $rr) / $total) * 100,
+            'cross_lf_rr_perc' => (($lf + $rr) / $total) * 100
+        ];
+    }
+}
+
+
+// Find the best performance achieved with this setup
 $stmt_best_performance = $pdo->prepare("
-    SELECT 
-        rl.best_lap_time,
-        t.name as track_name,
-        t.track_image_url,
-        e.event_name
+    SELECT rl.best_lap_time, t.name as track_name, t.track_image_url, e.event_name
     FROM race_logs rl
     JOIN tracks t ON rl.track_id = t.id
     JOIN race_events e ON rl.event_id = e.id
@@ -120,7 +137,7 @@ function display_data($label, $value) {
     </div>
     <hr>
 
-    <!-- NEW Peak Performance Section -->
+    <!-- Peak Performance Section -->
     <?php if ($data['best_performance']): ?>
     <div class="row mb-4">
         <div class="col-12">
@@ -134,14 +151,8 @@ function display_data($label, $value) {
                         </div>
                         <div class="col-md-9">
                             <h5 class="card-title">Peak Performance</h5>
-                            <p class="mb-1">
-                                The fastest lap time achieved with this setup was a 
-                                <strong><?php echo htmlspecialchars($data['best_performance']['best_lap_time']); ?></strong>.
-                            </p>
-                            <p class="mb-0 text-muted">
-                                Set at <strong><?php echo htmlspecialchars($data['best_performance']['track_name']); ?></strong> 
-                                during the event "<?php echo htmlspecialchars($data['best_performance']['event_name']); ?>".
-                            </p>
+                            <p class="mb-1">The fastest lap time achieved with this setup was a <strong><?php echo htmlspecialchars($data['best_performance']['best_lap_time']); ?></strong>.</p>
+                            <p class="mb-0 text-muted">Set at <strong><?php echo htmlspecialchars($data['best_performance']['track_name']); ?></strong> during the event "<?php echo htmlspecialchars($data['best_performance']['event_name']); ?>".</p>
                         </div>
                     </div>
                 </div>
@@ -166,6 +177,15 @@ function display_data($label, $value) {
             </dl>
         </div>
         <div class="col-lg-4 setup-section">
+            <h4>Drivetrain</h4>
+            <dl class="row">
+                <?php foreach($data['drivetrain'] as $key => $val) { if($key !== 'id' && $key !== 'setup_id') display_data(ucwords(str_replace('_', ' ', $key)), $val); } ?>
+            </dl>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 setup-section">
             <h4>Tires</h4>
             <h6 class="text-muted">Front</h6>
             <dl class="row">
@@ -176,16 +196,7 @@ function display_data($label, $value) {
                 <?php foreach($data['tires_rear'] as $key => $val) { if($key !== 'id' && $key !== 'setup_id' && $key !== 'position') display_data(ucwords(str_replace('_', ' ', $key)), $val); } ?>
             </dl>
         </div>
-    </div>
-
-    <div class="row">
-        <div class="col-lg-4 setup-section">
-            <h4>Drivetrain</h4>
-            <dl class="row">
-                <?php foreach($data['drivetrain'] as $key => $val) { if($key !== 'id' && $key !== 'setup_id') display_data(ucwords(str_replace('_', ' ', $key)), $val); } ?>
-            </dl>
-        </div>
-        <div class="col-lg-8 setup-section">
+        <div class="col-lg-6 setup-section">
             <h4>Electronics</h4>
             <dl class="row">
                 <?php foreach($data['electronics'] as $key => $val) { if($key !== 'id' && $key !== 'setup_id') display_data(ucwords(str_replace('_', ' ', $key)), $val); } ?>
@@ -194,28 +205,51 @@ function display_data($label, $value) {
     </div>
 
     <!-- Weight Distribution -->
-    <?php if ($data['weights']): ?>
+    <?php if ($data['weights'] && $data['weight_calcs']): ?>
     <div class="row">
         <div class="col-12 setup-section">
             <h4>Weight Distribution</h4>
-            <div class="row text-center">
-                <div class="col">
-                    <div><?php echo htmlspecialchars($data['weights']['lf_weight']); ?> g</div>
-                    <small class="text-muted">Left Front</small>
-                </div>
-                <div class="col">
-                    <div><?php echo htmlspecialchars($data['weights']['rf_weight']); ?> g</div>
-                    <small class="text-muted">Right Front</small>
-                </div>
-                <div class="col">
-                    <div><?php echo htmlspecialchars($data['weights']['lr_weight']); ?> g</div>
-                    <small class="text-muted">Left Rear</small>
-                </div>
-                <div class="col">
-                    <div><?php echo htmlspecialchars($data['weights']['rr_weight']); ?> g</div>
-                    <small class="text-muted">Right Rear</small>
-                </div>
-            </div>
+            <table class="table table-bordered text-center">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Left</th>
+                        <th>Right</th>
+                        <th>Total</th>
+                        <th>Percent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th>Front</th>
+                        <td><?php echo htmlspecialchars($data['weights']['lf_weight']); ?> g</td>
+                        <td><?php echo htmlspecialchars($data['weights']['rf_weight']); ?> g</td>
+                        <td><?php echo number_format(floatval($data['weights']['lf_weight']) + floatval($data['weights']['rf_weight']), 1); ?> g</td>
+                        <td><?php echo number_format($data['weight_calcs']['front_perc'], 1); ?>%</td>
+                    </tr>
+                    <tr>
+                        <th>Rear</th>
+                        <td><?php echo htmlspecialchars($data['weights']['lr_weight']); ?> g</td>
+                        <td><?php echo htmlspecialchars($data['weights']['rr_weight']); ?> g</td>
+                        <td><?php echo number_format(floatval($data['weights']['lr_weight']) + floatval($data['weights']['rr_weight']), 1); ?> g</td>
+                        <td><?php echo number_format($data['weight_calcs']['rear_perc'], 1); ?>%</td>
+                    </tr>
+                    <tr>
+                        <th>Total</th>
+                        <td><?php echo number_format(floatval($data['weights']['lf_weight']) + floatval($data['weights']['lr_weight']), 1); ?> g</td>
+                        <td><?php echo number_format(floatval($data['weights']['rf_weight']) + floatval($data['weights']['rr_weight']), 1); ?> g</td>
+                        <td><strong><?php echo number_format($data['weight_calcs']['total'], 1); ?> g</strong></td>
+                        <td></td>
+                    </tr>
+                     <tr>
+                        <th>Percent</th>
+                        <td><?php echo number_format($data['weight_calcs']['left_perc'], 1); ?>%</td>
+                        <td><?php echo number_format($data['weight_calcs']['right_perc'], 1); ?>%</td>
+                        <td></td>
+                        <td><strong>Cross:</strong> <?php echo number_format($data['weight_calcs']['cross_lf_rr_perc'], 1); ?>%</td>
+                    </tr>
+                </tbody>
+            </table>
             <?php if(!empty($data['weights']['notes'])): ?>
             <p class="mt-2"><strong>Notes:</strong> <?php echo htmlspecialchars($data['weights']['notes']); ?></p>
             <?php endif; ?>
