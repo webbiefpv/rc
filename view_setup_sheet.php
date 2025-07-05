@@ -122,7 +122,11 @@ function display_data($label, $value) {
             <h2><?php echo htmlspecialchars($setup['model_name']); ?></h2>
             <h4 class="text-muted"><?php echo htmlspecialchars($setup['name']); ?></h4>
         </div>
-        <a href="setup_form.php?setup_id=<?php echo $setup['id']; ?>" class="btn btn-primary">Edit This Setup</a>
+        <div> 
+            <a href="setup_form.php?setup_id=<?php echo $setup['id']; ?>" class="btn btn-primary">Edit This Setup</a>
+            
+            <a href="export_pdf.php?setup_id=<?php echo $setup['id']; ?>" class="btn btn-success ms-2" target="_blank">Download PDF</a>
+        </div>
     </div>
 
     <div class="mb-3">
