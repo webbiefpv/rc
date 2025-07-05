@@ -77,6 +77,7 @@ $tire_sets = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Tire Inventory - Pan Car Setup App</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <?php require 'header.php'; ?>
@@ -86,7 +87,38 @@ $tire_sets = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php echo $message; ?>
 
     <div class="card mb-4">
+        <div class="card-header">
+            <h5>Add New Tire Set to Inventory</h5>
         </div>
+        <div class="card-body">
+            <form method="POST">
+                <input type="hidden" name="action" value="add_set">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="set_name" class="form-label">Set Name (e.g., "New JFT Yellows")</label>
+                        <input type="text" class="form-control" id="set_name" name="set_name" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="brand" class="form-label">Brand</label>
+                        <input type="text" class="form-control" id="brand" name="brand" placeholder="e.g., Contact RC">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="compound" class="form-label">Compound / Shore</label>
+                        <input type="text" class="form-control" id="compound" name="compound" placeholder="e.g., 37sh">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="purchase_date" class="form-label">Purchase Date</label>
+                        <input type="date" class="form-control" id="purchase_date" name="purchase_date">
+                    </div>
+                    <div class="col-md-9">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="1" placeholder="e.g., For high-grip carpet only"></textarea>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Add Set</button>
+            </form>
+        </div>
+    </div>
 
     <h3>Your Tire Inventory</h3>
     <div class="table-responsive">
