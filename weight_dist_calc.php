@@ -249,7 +249,7 @@ $models_list = $stmt_models->fetchAll(PDO::FETCH_ASSOC);
         fetch(`ajax_get_setups.php?model_id=${modelId}`)
             .then(response => response.json())
             .then(data => {
-                setupSelect.innerHTML = '<option value="">-- Select a setup --</option>';
+                setupSelect.innerHTML = '<option value="">-- Select a setup to load or save --</option>';
                 data.forEach(setup => {
                     const option = document.createElement('option');
                     option.value = setup.id;
@@ -265,13 +265,27 @@ $models_list = $stmt_models->fetchAll(PDO::FETCH_ASSOC);
             resetCalculator();
             return;
         }
-        // This would require another AJAX helper file to fetch saved weights
-        // For now, this function can be a placeholder or built out later.
-        console.log("Loading weights for setup ID: " + setupId);
+        // Fetch saved weights for the selected setup
+        fetch(`ajax_get_weights.php?setup_id=${setupId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data) {
+                    document.getElementById('lf-input').value = data.lf_weight || '';
+                    document.getElementById('rf-input').value = data.rf_weight || '';
+                    document.getElementById('lr-input').value = data.lr_weight || '';
+                    document.getElementById('rr-input').value = data.rr_weight || '';
+                    document.getElementById('notes').value = data.notes || '';
+                } else {
+                    // If no saved data, clear the fields
+                    resetCalculator(false); // false to keep setup selected
+                }
+                // Recalculate all display values
+                calculateWeights();
+            })
+            .catch(error => console.error('Error fetching weights:', error));
     }
     
     function prepareAndSubmit() {
-        // Copy values from visible inputs to hidden inputs before submitting
         document.getElementById('lf_weight_hidden').value = document.getElementById('lf-input').value;
         document.getElementById('rf_weight_hidden').value = document.getElementById('rf-input').value;
         document.getElementById('lr_weight_hidden').value = document.getElementById('lr-input').value;
@@ -279,13 +293,16 @@ $models_list = $stmt_models->fetchAll(PDO::FETCH_ASSOC);
         document.getElementById('save-form').submit();
     }
 
-    function resetCalculator() {
+    function resetCalculator(clearSelectors = true) {
         document.getElementById('lf-input').value = '';
         document.getElementById('rf-input').value = '';
         document.getElementById('lr-input').value = '';
         document.getElementById('rr-input').value = '';
         document.getElementById('notes').value = '';
-        document.getElementById('setup_id').selectedIndex = 0;
+        if (clearSelectors) {
+            document.getElementById('model_id').selectedIndex = 0;
+            document.getElementById('setup_id').innerHTML = '<option value="">-- Select a model first --</option>';
+        }
         calculateWeights();
     }
 
