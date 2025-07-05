@@ -39,8 +39,13 @@ $data['tires_rear'] = $stmt_tires->fetch(PDO::FETCH_ASSOC);
 // Extend TCPDF to create custom Header and Footer
 class MYPDF extends TCPDF {
     public function Header() {
+        // --- THIS IS THE CHANGE ---
+        // Set the Y position to 15mm from the top of the page.
+        // The default is ~10mm. Increase this value to move the header further down.
+        $this->SetY(15);
+        
         $this->SetFont('helvetica', 'B', 16);
-        $this->Cell(0, 15, '1/12 Pan Car Setup Sheet', 0, false, 'C', 0, '', 0, false, 'M', 'M');
+        $this->Cell(0, 15, 'RC Car Setup Sheet', 0, false, 'C', 0, '', 0, false, 'M', 'M');
     }
     public function Footer() {
         $this->SetY(-15);
