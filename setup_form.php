@@ -95,47 +95,67 @@ function render_field($field_name, $input_name, $saved_value, $options_by_catego
     <h1>Setup: <?php echo htmlspecialchars($setup['name']); ?></h1>
     
     <?php if(isset($_GET['success'])) echo '<div class="alert alert-success">Setup saved successfully!</div>'; ?>
-    <?php if(isset($_GET['error'])) echo '<div class="alert alert-danger">An error occurred while saving.</div>'; ?>
+    <?php if(isset($_GET['error'])) echo '<div class="alert alert-danger">An error occurred while saving. Please check your data.</div>'; ?>
+    <?php if(isset($_GET['msg'])) echo '<div class="alert alert-danger">'.htmlspecialchars($_GET['msg']).'</div>'; ?>
 
     <form method="POST">
-        <?php
-        $form_sections = [
-            'Front Suspension' => 'front_suspension', 'Rear Suspension' => 'rear_suspension',
-            'Front Tires' => 'tires_front', 'Rear Tires' => 'tires_rear',
-            'Drivetrain' => 'drivetrain', 'Body and Chassis' => 'body_chassis',
-            'Electronics' => 'electronics', 'ESC Settings' => 'esc_settings', 'Comments' => 'comments'
-        ];
         
-        foreach ($form_sections as $title => $section_key):
+        <h3>Front Suspension</h3>
+        <div class="row">
+        <?php
+            $fields = ['ackermann', 'arms', 'bumpsteer', 'droop_shims', 'kingpin_fluid', 'ride_height', 'arm_shims', 'springs', 'steering_blocks', 'steering_limiter', 'track_wheel_shims'];
+            foreach ($fields as $field) {
+                render_field($field, 'front_suspension[' . $field . ']', $data['front_suspension'][$field] ?? null, $options_by_category);
+            }
         ?>
-            <h3><?php echo $title; ?></h3>
-            <div class="row">
-                </div>
-
-            <div id="custom-fields-<?php echo $section_key; ?>" class="mt-3">
-                <?php if (!empty($custom_fields_by_section[$section_key])): ?>
-                    <?php foreach ($custom_fields_by_section[$section_key] as $index => $custom_field): ?>
-                        <div class="row custom-field-row mb-2">
-                            <div class="col-md-5">
-                                <input type="text" class="form-control" placeholder="Custom Field Label" name="custom_fields[<?php echo $section_key; ?>][<?php echo $index; ?>][label]" value="<?php echo htmlspecialchars($custom_field['field_label']); ?>">
-                            </div>
-                            <div class="col-md-5">
-                                <input type="text" class="form-control" placeholder="Value" name="custom_fields[<?php echo $section_key; ?>][<?php echo $index; ?>][value]" value="<?php echo htmlspecialchars($custom_field['field_value']); ?>">
-                            </div>
-                            <div class="col-md-2">
-                                <button type="button" class="btn btn-danger w-100" onclick="this.closest('.custom-field-row').remove();">Remove</button>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+        </div>
+        <div id="custom-fields-front_suspension" class="mt-3">
             </div>
+        <div class="mt-2 mb-4">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomField('front_suspension')">Add Custom Field</button>
+        </div>
 
-            <div class="mt-2 mb-4">
-                <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomField('<?php echo $section_key; ?>')">
-                    Add Custom Field to <?php echo $title; ?>
-                </button>
-            </div>
-        <?php endforeach; ?>
+        <h3>Rear Suspension</h3>
+        <div class="row">
+        <?php
+            $fields = ['axle_height', 'centre_pivot_ball', 'centre_pivot_fluid', 'droop', 'rear_pod_shims', 'rear_spring', 'ride_height', 'side_bands_lr'];
+            foreach ($fields as $field) {
+                render_field($field, 'rear_suspension[' . $field . ']', $data['rear_suspension'][$field] ?? null, $options_by_category);
+            }
+        ?>
+        </div>
+        <div id="custom-fields-rear_suspension" class="mt-3"></div>
+        <div class="mt-2 mb-4">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomField('rear_suspension')">Add Custom Field</button>
+        </div>
+        
+        <h3>Front Tires</h3>
+        <div class="row">
+        <?php
+            $fields = ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
+            foreach ($fields as $field) {
+                render_field($field, 'tires_front[' . $field . ']', $data['tires_front'][$field] ?? null, $options_by_category);
+            }
+        ?>
+        </div>
+        <div id="custom-fields-tires_front" class="mt-3"></div>
+        <div class="mt-2 mb-4">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomField('tires_front')">Add Custom Field</button>
+        </div>
+
+        <h3>Rear Tires</h3>
+        <div class="row">
+        <?php
+            $fields = ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
+            foreach ($fields as $field) {
+                render_field($field, 'tires_rear[' . $field . ']', $data['tires_rear'][$field] ?? null, $options_by_category);
+            }
+        ?>
+        </div>
+        <div id="custom-fields-tires_rear" class="mt-3"></div>
+        <div class="mt-2 mb-4">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomField('tires_rear')">Add Custom Field</button>
+        </div>
 
         <hr>
         <button type="submit" name="save_setup" class="btn btn-primary">Save All Changes</button>
