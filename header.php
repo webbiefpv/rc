@@ -19,7 +19,7 @@
 					<a class="nav-link" href="rollout_calc.php">Roll Out</a>
 				</li>
 				<li class="nav-item">
-					<a class="nav-link" href="rweight_dist_calc.php">Weight Calculator</a>
+					<a class="nav-link" href="weight_dist_calc.php">Weight Calculator</a>
 				</li>
 				<li class="nav-item">
     				<a class="nav-link" href="events.php">Race Events</a>

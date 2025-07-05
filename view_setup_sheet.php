@@ -54,10 +54,23 @@ $stmt_weights = $pdo->prepare("SELECT * FROM weight_distribution WHERE setup_id 
 $stmt_weights->execute([$setup_id]);
 $data['weights'] = $stmt_weights->fetch(PDO::FETCH_ASSOC);
 
-// Best Lap Time achieved with this setup
-$stmt_best_lap = $pdo->prepare("SELECT MIN(best_lap_time) FROM race_logs WHERE setup_id = ? AND best_lap_time > 0");
-$stmt_best_lap->execute([$setup_id]);
-$data['best_lap'] = $stmt_best_lap->fetchColumn();
+// --- MODIFIED QUERY ---
+// Find the entire race log entry where the best lap was achieved with this setup
+$stmt_best_performance = $pdo->prepare("
+    SELECT 
+        rl.best_lap_time,
+        t.name as track_name,
+        t.track_image_url,
+        e.event_name
+    FROM race_logs rl
+    JOIN tracks t ON rl.track_id = t.id
+    JOIN race_events e ON rl.event_id = e.id
+    WHERE rl.setup_id = ? AND rl.best_lap_time > 0
+    ORDER BY rl.best_lap_time ASC
+    LIMIT 1
+");
+$stmt_best_performance->execute([$setup_id]);
+$data['best_performance'] = $stmt_best_performance->fetch(PDO::FETCH_ASSOC);
 
 
 // Helper function to display a data point if it exists
@@ -106,6 +119,37 @@ function display_data($label, $value) {
         <?php endif; ?>
     </div>
     <hr>
+
+    <!-- NEW Peak Performance Section -->
+    <?php if ($data['best_performance']): ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <?php if (!empty($data['best_performance']['track_image_url'])): ?>
+                                <img src="<?php echo htmlspecialchars($data['best_performance']['track_image_url']); ?>" class="img-fluid rounded" alt="Track Layout">
+                            <?php endif; ?>
+                        </div>
+                        <div class="col-md-9">
+                            <h5 class="card-title">Peak Performance</h5>
+                            <p class="mb-1">
+                                The fastest lap time achieved with this setup was a 
+                                <strong><?php echo htmlspecialchars($data['best_performance']['best_lap_time']); ?></strong>.
+                            </p>
+                            <p class="mb-0 text-muted">
+                                Set at <strong><?php echo htmlspecialchars($data['best_performance']['track_name']); ?></strong> 
+                                during the event "<?php echo htmlspecialchars($data['best_performance']['event_name']); ?>".
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
 
     <!-- Main Data Sections -->
     <div class="row">
