@@ -1,7 +1,4 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 require 'db_config.php';
 require 'auth.php';
 requireLogin();
@@ -13,15 +10,19 @@ $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_setup') {
     $setup_id_to_delete = intval($_POST['setup_id']);
 
-    // Security check: ensure the setup belongs to the user
-    $stmt_check = $pdo->prepare("SELECT id FROM setups s JOIN models m ON s.model_id = m.id WHERE s.id = ? AND m.user_id = ?");
+    // --- THIS IS THE FIX ---
+    // The query now explicitly says "SELECT s.id" instead of just "SELECT id"
+    $stmt_check = $pdo->prepare("SELECT s.id FROM setups s JOIN models m ON s.model_id = m.id WHERE s.id = ? AND m.user_id = ?");
     $stmt_check->execute([$setup_id_to_delete, $user_id]);
+
     if ($stmt_check->fetch()) {
         // The ON DELETE CASCADE constraint on the database will handle deleting all related data
         // from other tables (race_logs, weight_distribution, etc.)
         $stmt_delete = $pdo->prepare("DELETE FROM setups WHERE id = ?");
         $stmt_delete->execute([$setup_id_to_delete]);
         $message = '<div class="alert alert-success">Setup and all its associated data have been permanently deleted.</div>';
+    } else {
+        $message = '<div class="alert alert-danger">Could not delete setup. It may not exist or you may not have permission.</div>';
     }
 }
 
