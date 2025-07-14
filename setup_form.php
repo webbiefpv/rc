@@ -200,11 +200,18 @@ function render_field($field_name, $input_name, $saved_value, $options_by_catego
         <?php
             $fields = ['axle_type', 'gear_pitch'];
             foreach ($fields as $field) { render_field($field, 'drivetrain[' . $field . ']', $data['drivetrain'][$field] ?? null, $options_by_category); }
+            
             render_field('spur', 'drivetrain[spur]', $data['drivetrain']['spur'] ?? null, $options_by_category, 'oninput="calculateRollout()"');
             render_field('pinion', 'drivetrain[pinion]', $data['drivetrain']['pinion'] ?? null, $options_by_category, 'oninput="calculateRollout()"');
+            
             render_field('drive_ratio', 'drivetrain[drive_ratio]', $data['drivetrain']['drive_ratio'] ?? null, $options_by_category, 'readonly');
             render_field('rollout', 'drivetrain[rollout]', $data['drivetrain']['rollout'] ?? null, $options_by_category, 'readonly');
         ?>
+        </div>
+        <div class="mt-2 mb-4">
+            <button type="submit" class="btn btn-sm btn-outline-info" formaction="rollout_calc.php" formmethod="POST">
+                Analyze Gearing in Rollout Calculator
+            </button>
         </div>
 
         <h3>Body and Chassis</h3>
