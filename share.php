@@ -1,6 +1,7 @@
 <?php
-// This page does NOT require a login. It is public.
+// This page does NOT require a login, but it can check if a user is logged in.
 require 'db_config.php';
+require 'auth.php'; // This makes isLoggedIn() available but doesn't force a login.
 
 // 1. Get the share token from the URL
 if (!isset($_GET['token'])) {
@@ -31,14 +32,18 @@ if (!$setup) {
         $stmt_data->execute([$setup_id]);
         $data[$table] = $stmt_data->fetch(PDO::FETCH_ASSOC);
     }
+    // Tires
     $stmt_tires = $pdo->prepare("SELECT * FROM tires WHERE setup_id = ? AND position = ?");
     $stmt_tires->execute([$setup_id, 'front']);
     $data['tires_front'] = $stmt_tires->fetch(PDO::FETCH_ASSOC);
     $stmt_tires->execute([$setup_id, 'rear']);
     $data['tires_rear'] = $stmt_tires->fetch(PDO::FETCH_ASSOC);
+
+    // Weight Distribution
     $stmt_weights = $pdo->prepare("SELECT * FROM weight_distribution WHERE setup_id = ?");
     $stmt_weights->execute([$setup_id]);
     $data['weights'] = $stmt_weights->fetch(PDO::FETCH_ASSOC);
+    $data['weight_calcs'] = null;
     if ($data['weights']) {
         $lf = floatval($data['weights']['lf_weight']); $rf = floatval($data['weights']['rf_weight']);
         $lr = floatval($data['weights']['lr_weight']); $rr = floatval($data['weights']['rr_weight']);
@@ -84,6 +89,11 @@ function display_data($label, $value) {
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="#">Pan Car Setup Viewer</a>
+        <?php if (isLoggedIn()): ?>
+            <a href="index.php" class="btn btn-outline-light">Back to My Pits</a>
+        <?php else: ?>
+            <a href="login.php" class="btn btn-outline-light">Login or Register to Import</a>
+        <?php endif; ?>
     </div>
 </nav>
 <div class="container mt-4">
@@ -99,6 +109,13 @@ function display_data($label, $value) {
                 <h2><?php echo htmlspecialchars($setup['model_name']); ?></h2>
                 <h4 class="text-muted"><?php echo htmlspecialchars($setup['name']); ?></h4>
             </div>
+            <!-- NEW: Import Button for logged-in users -->
+            <?php if (isLoggedIn()): ?>
+                <form action="import_setup.php" method="POST">
+                    <input type="hidden" name="share_token" value="<?php echo htmlspecialchars($share_token); ?>">
+                    <button type="submit" class="btn btn-success">Import This Setup to My Account</button>
+                </form>
+            <?php endif; ?>
         </div>
         <hr>
 
@@ -128,16 +145,38 @@ function display_data($label, $value) {
                 </dl>
             </div>
         </div>
-        <!-- ... Other sections like Drivetrain, Electronics ... -->
+        <div class="row">
+            <div class="col-lg-4 setup-section">
+                <h4>Drivetrain</h4>
+                <dl class="row">
+                    <?php foreach($data['drivetrain'] as $key => $val) { if($key !== 'id' && $key !== 'setup_id') display_data(ucwords(str_replace('_', ' ', $key)), $val); } ?>
+                </dl>
+            </div>
+            <div class="col-lg-8 setup-section">
+                <h4>Electronics</h4>
+                <dl class="row">
+                    <?php foreach($data['electronics'] as $key => $val) { if($key !== 'id' && $key !== 'setup_id') display_data(ucwords(str_replace('_', ' ', $key)), $val); } ?>
+                </dl>
+            </div>
+        </div>
         
         <!-- Weight Distribution -->
-        <?php if (isset($data['weights']) && $data['weights']): ?>
+        <?php if (isset($data['weights']) && $data['weights'] && isset($data['weight_calcs'])): ?>
         <div class="row">
             <div class="col-12 setup-section">
                 <h4>Weight Distribution</h4>
                 <table class="table table-bordered text-center">
-                    <!-- ... (The weight distribution table HTML from view_setup_sheet.php) ... -->
+                    <thead>
+                        <tr><th></th><th>Left</th><th>Right</th><th>Total</th><th>Percent</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><th>Front</th><td><?php echo htmlspecialchars($data['weights']['lf_weight']); ?> g</td><td><?php echo htmlspecialchars($data['weights']['rf_weight']); ?> g</td><td><?php echo number_format(floatval($data['weights']['lf_weight']) + floatval($data['weights']['rf_weight']), 1); ?> g</td><td><?php echo number_format($data['weight_calcs']['front_perc'], 1); ?>%</td></tr>
+                        <tr><th>Rear</th><td><?php echo htmlspecialchars($data['weights']['lr_weight']); ?> g</td><td><?php echo htmlspecialchars($data['weights']['rr_weight']); ?> g</td><td><?php echo number_format(floatval($data['weights']['lr_weight']) + floatval($data['weights']['rr_weight']), 1); ?> g</td><td><?php echo number_format($data['weight_calcs']['rear_perc'], 1); ?>%</td></tr>
+                        <tr><th>Total</th><td><?php echo number_format(floatval($data['weights']['lf_weight']) + floatval($data['weights']['lr_weight']), 1); ?> g</td><td><?php echo number_format(floatval($data['weights']['rf_weight']) + floatval($data['weights']['rr_weight']), 1); ?> g</td><td><strong><?php echo number_format($data['weight_calcs']['total'], 1); ?> g</strong></td><td></td></tr>
+                        <tr><th>Percent</th><td><?php echo number_format($data['weight_calcs']['left_perc'], 1); ?>%</td><td><?php echo number_format($data['weight_calcs']['right_perc'], 1); ?>%</td><td></td><td><strong>Cross:</strong> <?php echo number_format($data['weight_calcs']['cross_lf_rr_perc'], 1); ?>%</td></tr>
+                    </tbody>
                 </table>
+                 <?php if(!empty($data['weights']['notes'])): ?><p class="mt-2"><strong>Notes:</strong> <?php echo htmlspecialchars($data['weights']['notes']); ?></p><?php endif; ?>
             </div>
         </div>
         <?php endif; ?>
