@@ -5,13 +5,13 @@ requireLogin();
 
 $user_id = $_SESSION['user_id'];
 $message = '';
-$setup_id = $_GET['setup_id'];
 
 // --- 1. GET THE SETUP AND VERIFY OWNERSHIP ---
 if (!isset($_GET['setup_id'])) {
     header('Location: index.php');
     exit;
 }
+$setup_id = intval($_GET['setup_id']);
 $stmt_setup = $pdo->prepare("SELECT s.*, m.user_id FROM setups s JOIN models m ON s.model_id = m.id WHERE s.id = ?");
 $stmt_setup->execute([$setup_id]);
 $setup = $stmt_setup->fetch(PDO::FETCH_ASSOC);
@@ -25,7 +25,7 @@ $all_options_raw = $stmt_options->fetchAll(PDO::FETCH_ASSOC);
 $options_by_category = [];
 foreach ($all_options_raw as $option) { $options_by_category[$option['option_category']][] = $option['option_value']; }
 
-// Fetch all standard field data for this setup
+// Fetch all standard field data for this setup to see what exists
 $data = [];
 $tables = ['front_suspension', 'rear_suspension', 'drivetrain', 'body_chassis', 'electronics', 'esc_settings', 'comments'];
 foreach ($tables as $table) {
@@ -54,10 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
             $stmt_reset->execute([$setup['model_id'], $setup_id]);
         }
         
-        // Save each section explicitly
+        // List of all sections and their fields
         $sections_to_save = [
             'front_suspension' => ['ackermann', 'arms', 'bumpsteer', 'droop_shims', 'kingpin_fluid', 'ride_height', 'arm_shims', 'springs', 'steering_blocks', 'steering_limiter', 'track_wheel_shims', 'notes'],
-            'rear_suspension'  => ['axle_height', 'centre_pivot_ball', 'centre_pivot_fluid', 'droop', 'rear_pod_shims', 'rear_spring', 'ride_height', 'side_springs', 'side_bands_lr', 'notes'], // ADDED side_springs
+            'rear_suspension'  => ['axle_height', 'centre_pivot_ball', 'centre_pivot_fluid', 'droop', 'rear_pod_shims', 'rear_spring', 'ride_height', 'side_springs', 'side_bands_lr', 'notes'],
             'drivetrain'       => ['axle_type', 'drive_ratio', 'gear_pitch', 'rollout', 'spur'],
             'body_chassis'     => ['battery_position', 'body', 'body_mounting', 'chassis', 'electronics_layout', 'motor_position', 'motor_shims', 'rear_wing', 'screw_turn_buckles', 'servo_position', 'weight_balance_fr', 'weight_total', 'weights'],
             'electronics'      => ['battery_brand', 'esc_brand', 'motor_brand', 'radio_brand', 'servo_brand', 'battery', 'battery_c_rating', 'capacity', 'model', 'esc_model', 'motor_kv_constant', 'motor_model', 'motor_timing', 'motor_wind', 'radio_model', 'receiver_model', 'servo_model', 'transponder_id', 'charging_notes'],
@@ -65,15 +65,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
             'comments'         => ['comment']
         ];
 
+        // Loop through and save each section
         foreach ($sections_to_save as $table_name => $fields) {
             $post_data = $_POST[$table_name] ?? [];
-            $set_clause = implode(' = ?, ', $fields) . ' = ?';
-            $sql = "UPDATE $table_name SET $set_clause WHERE setup_id = ?";
-            
             $params = [];
             foreach($fields as $field) { $params[] = $post_data[$field] ?? null; }
-            $params[] = $setup_id;
-            
+
+            // Check if data exists to decide between UPDATE and INSERT
+            if ($data[$table_name]) { // UPDATE
+                $set_clause = implode(' = ?, ', $fields) . ' = ?';
+                $sql = "UPDATE $table_name SET $set_clause WHERE setup_id = ?";
+                $params[] = $setup_id;
+            } else { // INSERT
+                $cols = implode(', ', $fields);
+                $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+                $sql = "INSERT INTO $table_name (setup_id, $cols) VALUES (?, $placeholders)";
+                array_unshift($params, $setup_id);
+            }
             $stmt_save = $pdo->prepare($sql);
             $stmt_save->execute($params);
         }
@@ -81,19 +89,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
         // Special handling for TIRES (front and rear)
         $tire_fields = ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
         
+        // Front Tires
         $front_tires_post = $_POST['tires_front'] ?? [];
         $front_params = [];
         foreach($tire_fields as $field) { $front_params[] = $front_tires_post[$field] ?? null; }
-        $stmt_front = $pdo->prepare("UPDATE tires SET tire_brand=?, tire_compound=?, wheel_brand_type=?, tire_additive=?, tire_additive_area=?, tire_additive_time=?, tire_diameter=?, tire_side_wall_glue=? WHERE setup_id = ? AND position = 'front'");
-        $front_params[] = $setup_id;
-        $stmt_front->execute($front_params);
+        if ($data['tires_front']) {
+            $stmt_front = $pdo->prepare("UPDATE tires SET tire_brand=?, tire_compound=?, wheel_brand_type=?, tire_additive=?, tire_additive_area=?, tire_additive_time=?, tire_diameter=?, tire_side_wall_glue=? WHERE setup_id = ? AND position = 'front'");
+            $front_params[] = $setup_id;
+            $stmt_front->execute($front_params);
+        } else {
+            $stmt_front = $pdo->prepare("INSERT INTO tires (setup_id, position, tire_brand, tire_compound, wheel_brand_type, tire_additive, tire_additive_area, tire_additive_time, tire_diameter, tire_side_wall_glue) VALUES (?, 'front', ?, ?, ?, ?, ?, ?, ?, ?)");
+            array_unshift($front_params, $setup_id);
+            $stmt_front->execute($front_params);
+        }
         
+        // Rear Tires
         $rear_tires_post = $_POST['tires_rear'] ?? [];
         $rear_params = [];
         foreach($tire_fields as $field) { $rear_params[] = $rear_tires_post[$field] ?? null; }
-        $stmt_rear = $pdo->prepare("UPDATE tires SET tire_brand=?, tire_compound=?, wheel_brand_type=?, tire_additive=?, tire_additive_area=?, tire_additive_time=?, tire_diameter=?, tire_side_wall_glue=? WHERE setup_id = ? AND position = 'rear'");
-        $rear_params[] = $setup_id;
-        $stmt_rear->execute($rear_params);
+        if ($data['tires_rear']) {
+            $stmt_rear = $pdo->prepare("UPDATE tires SET tire_brand=?, tire_compound=?, wheel_brand_type=?, tire_additive=?, tire_additive_area=?, tire_additive_time=?, tire_diameter=?, tire_side_wall_glue=? WHERE setup_id = ? AND position = 'rear'");
+            $rear_params[] = $setup_id;
+            $stmt_rear->execute($rear_params);
+        } else {
+            $stmt_rear = $pdo->prepare("INSERT INTO tires (setup_id, position, tire_brand, tire_compound, wheel_brand_type, tire_additive, tire_additive_area, tire_additive_time, tire_diameter, tire_side_wall_glue) VALUES (?, 'rear', ?, ?, ?, ?, ?, ?, ?, ?)");
+            array_unshift($rear_params, $setup_id);
+            $stmt_rear->execute($rear_params);
+        }
 
         $pdo->commit();
         header("Location: setup_form.php?setup_id=" . $setup_id . "&success=1");
@@ -110,7 +132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_setup'])) {
 // --- 4. HELPER FUNCTION TO RENDER FORM FIELDS ---
 function render_field($field_name, $input_name, $saved_value, $options_by_category) {
     $label = ucwords(str_replace('_', ' ', $field_name));
-    // If a category exists for this field, render a dropdown
     if (isset($options_by_category[$field_name])) {
         $options = $options_by_category[$field_name];
         echo '<div class="col-md-4 mb-3"><label class="form-label">' . $label . '</label><select class="form-select" name="' . $input_name . '">';
@@ -123,7 +144,7 @@ function render_field($field_name, $input_name, $saved_value, $options_by_catego
             echo '<option value="' . htmlspecialchars($saved_value) . '" selected>CUSTOM: ' . htmlspecialchars($saved_value) . '</option>';
         }
         echo '</select></div>';
-    } else { // Otherwise, render a text input
+    } else {
         echo '<div class="col-md-4 mb-3"><label class="form-label">' . $label . '</label><input type="text" class="form-control" name="' . $input_name . '" value="' . htmlspecialchars($saved_value ?? '') . '"></div>';
     }
 }
@@ -140,64 +161,89 @@ function render_field($field_name, $input_name, $saved_value, $options_by_catego
 <?php require 'header.php'; ?>
 <div class="container mt-3">
     <h1>Setup: <?php echo htmlspecialchars($setup['name']); ?></h1>
-    
     <?php if(isset($_GET['success'])) echo '<div class="alert alert-success">Setup saved successfully!</div>'; ?>
     <?php if(isset($_GET['error'])) echo '<div class="alert alert-danger">An error occurred while saving. Please check your data.</div>'; ?>
-
+    
     <form method="POST">
-        
-        <div class="accordion" id="setupFormAccordion">
-            <?php
-            $form_structure = [
-                'Front Suspension' => ['section_key' => 'front_suspension', 'fields' => ['ackermann', 'arms', 'bumpsteer', 'droop_shims', 'kingpin_fluid', 'ride_height', 'arm_shims', 'springs', 'steering_blocks', 'steering_limiter', 'track_wheel_shims']],
-                'Rear Suspension'  => ['section_key' => 'rear_suspension', 'fields' => ['axle_height', 'centre_pivot_ball', 'centre_pivot_fluid', 'droop', 'rear_pod_shims', 'rear_spring', 'ride_height', 'side_springs', 'side_bands_lr']],
-                'Front Tires'      => ['section_key' => 'tires_front', 'fields' => ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue']],
-                'Rear Tires'       => ['section_key' => 'tires_rear', 'fields' => ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue']],
-                'Drivetrain'       => ['section_key' => 'drivetrain', 'fields' => ['axle_type', 'drive_ratio', 'gear_pitch', 'rollout', 'spur']],
-                'Body and Chassis' => ['section_key' => 'body_chassis', 'fields' => ['battery_position', 'body', 'body_mounting', 'chassis', 'electronics_layout', 'motor_position', 'motor_shims', 'rear_wing', 'screw_turn_buckles', 'servo_position', 'weight_balance_fr', 'weight_total', 'weights']],
-                'Electronics'      => ['section_key' => 'electronics', 'fields' => ['battery_brand', 'esc_brand', 'motor_brand', 'radio_brand', 'servo_brand', 'battery', 'battery_c_rating', 'capacity', 'model', 'esc_model', 'motor_kv_constant', 'motor_model', 'motor_timing', 'motor_wind', 'radio_model', 'receiver_model', 'servo_model', 'transponder_id']],
-                'ESC Settings'     => ['section_key' => 'esc_settings', 'fields' => ['boost_activation', 'boost_rpm_end', 'boost_rpm_start', 'boost_ramp', 'boost_timing', 'brake_curve', 'brake_drag', 'brake_frequency', 'brake_initial_strength', 'race_mode', 'throttle_curve', 'throttle_frequency', 'throttle_initial_strength', 'throttle_neutral_range', 'throttle_strength', 'turbo_activation_method', 'turbo_delay', 'turbo_ramp', 'turbo_timing']],
-                'Notes and Comments' => ['section_key' => 'comments', 'fields' => ['notes', 'comment']] // Grouping notes and comments
-            ];
-            
-            foreach ($form_structure as $title => $section_details):
-                $section_key = $section_details['section_key'];
-                $section_id = preg_replace('/[^a-zA-Z0-9]/', '', $section_key);
-            ?>
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="heading-<?php echo $section_id; ?>">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-<?php echo $section_id; ?>" aria-expanded="false" aria-controls="collapse-<?php echo $section_id; ?>">
-                            <strong><?php echo $title; ?></strong>
-                        </button>
-                    </h2>
-                    <div id="collapse-<?php echo $section_id; ?>" class="accordion-collapse collapse" aria-labelledby="heading-<?php echo $section_id; ?>" data-bs-parent="#setupFormAccordion">
-                        <div class="accordion-body">
-                            <div class="row">
-                            <?php
-                            foreach ($section_details['fields'] as $field) {
-                                // Special handling for combined notes section
-                                if ($title === 'Notes and Comments') {
-                                    $note_section_key = ($field === 'notes') ? 'front_suspension' : 'comments';
-                                    $note_input_name = $note_section_key . '[' . $field . ']';
-                                    $note_saved_value = $data[$note_section_key][$field] ?? '';
-                                    echo '<div class="col-12 mb-3"><label class="form-label">' . ucwords($field) . '</label><textarea class="form-control" name="' . $note_input_name . '">' . htmlspecialchars($note_saved_value) . '</textarea></div>';
-                                } else {
-                                    // Standard field rendering
-                                    render_field($field, $section_key . '[' . $field . ']', $data[$section_key][$field] ?? null, $options_by_category);
-                                }
-                            }
-                            ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
+        <!-- RENDER ALL FORM SECTIONS -->
+        <h3>Front Suspension</h3>
+        <div class="row">
+        <?php
+            $fields = ['ackermann', 'arms', 'bumpsteer', 'droop_shims', 'kingpin_fluid', 'ride_height', 'arm_shims', 'springs', 'steering_blocks', 'steering_limiter', 'track_wheel_shims'];
+            foreach ($fields as $field) { render_field($field, 'front_suspension[' . $field . ']', $data['front_suspension'][$field] ?? null, $options_by_category); }
+        ?>
         </div>
 
-        <hr>
-        <div class="mt-3">
-            <button type="submit" name="save_setup" class="btn btn-primary">Save All Changes</button>
+        <h3>Rear Suspension</h3>
+        <div class="row">
+        <?php
+            $fields = ['axle_height', 'centre_pivot_ball', 'centre_pivot_fluid', 'droop', 'rear_pod_shims', 'rear_spring', 'ride_height', 'side_springs', 'side_bands_lr'];
+            foreach ($fields as $field) { render_field($field, 'rear_suspension[' . $field . ']', $data['rear_suspension'][$field] ?? null, $options_by_category); }
+        ?>
+        </div>
+
+        <h3>Front Tires</h3>
+        <div class="row">
+        <?php
+            $fields = ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
+            foreach ($fields as $field) { render_field($field, 'tires_front[' . $field . ']', $data['tires_front'][$field] ?? null, $options_by_category); }
+        ?>
+        </div>
+
+        <h3>Rear Tires</h3>
+        <div class="row">
+        <?php
+            $fields = ['tire_brand', 'tire_compound', 'wheel_brand_type', 'tire_additive', 'tire_additive_area', 'tire_additive_time', 'tire_diameter', 'tire_side_wall_glue'];
+            foreach ($fields as $field) { render_field($field, 'tires_rear[' . $field . ']', $data['tires_rear'][$field] ?? null, $options_by_category); }
+        ?>
+        </div>
+
+        <h3>Drivetrain</h3>
+        <div class="row">
+        <?php
+            $fields = ['axle_type', 'drive_ratio', 'gear_pitch', 'rollout', 'spur'];
+            foreach ($fields as $field) { render_field($field, 'drivetrain[' . $field . ']', $data['drivetrain'][$field] ?? null, $options_by_category); }
+        ?>
+        </div>
+
+        <h3>Body and Chassis</h3>
+        <div class="row">
+        <?php
+            $fields = ['battery_position', 'body', 'body_mounting', 'chassis', 'electronics_layout', 'motor_position', 'motor_shims', 'rear_wing', 'screw_turn_buckles', 'servo_position', 'weight_balance_fr', 'weight_total', 'weights'];
+            foreach ($fields as $field) { render_field($field, 'body_chassis[' . $field . ']', $data['body_chassis'][$field] ?? null, $options_by_category); }
+        ?>
+        </div>
+
+        <h3>Electronics</h3>
+        <div class="row">
+        <?php
+            $fields = ['battery_brand', 'esc_brand', 'motor_brand', 'radio_brand', 'servo_brand', 'battery', 'battery_c_rating', 'capacity', 'model', 'esc_model', 'motor_kv_constant', 'motor_model', 'motor_timing', 'motor_wind', 'radio_model', 'receiver_model', 'servo_model', 'transponder_id'];
+            foreach ($fields as $field) { render_field($field, 'electronics[' . $field . ']', $data['electronics'][$field] ?? null, $options_by_category); }
+        ?>
+        </div>
+        
+        <h3>ESC Settings</h3>
+        <div class="row">
+        <?php
+            $fields = ['boost_activation', 'boost_rpm_end', 'boost_rpm_start', 'boost_ramp', 'boost_timing', 'brake_curve', 'brake_drag', 'brake_frequency', 'brake_initial_strength', 'race_mode', 'throttle_curve', 'throttle_frequency', 'throttle_initial_strength', 'throttle_neutral_range', 'throttle_strength', 'turbo_activation_method', 'turbo_delay', 'turbo_ramp', 'turbo_timing'];
+            foreach ($fields as $field) { render_field($field, 'esc_settings[' . $field . ']', $data['esc_settings'][$field] ?? null, $options_by_category); }
+        ?>
+        </div>
+
+        <h3>Notes and Comments</h3>
+        <div class="row">
+            <div class="col-12 mb-3">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" name="front_suspension[notes]"><?php echo htmlspecialchars($data['front_suspension']['notes'] ?? ''); ?></textarea>
             </div>
+            <div class="col-12 mb-3">
+                <label class="form-label">Comments</label>
+                <textarea class="form-control" name="comments[comment]"><?php echo htmlspecialchars($data['comments']['comment'] ?? ''); ?></textarea>
+            </div>
+        </div>
+        
+        <hr>
+        <button type="submit" name="save_setup" class="btn btn-primary">Save All Changes</button>
     </form>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
