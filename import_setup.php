@@ -116,7 +116,93 @@ $my_models = $stmt_my_models->fetchAll(PDO::FETCH_ASSOC);
     <div class="card bg-light mb-4">
         <div class="card-body">
             <h5 class="card-title"><?php echo htmlspecialchars($original_setup_data['name']); ?></h5>
+            <h6 class="card-subtitle mb-2 text-mut<?php
+require 'db_config.php';
+require 'auth.php';
+requireLogin(); // A user MUST be logged in to import a setup.
+
+$user_id = $_SESSION['user_id'];
+$message = '';
+
+// --- DEBUGGING: Check what is being sent to this page ---
+var_dump($_POST);
+
+// --- 1. Get the original setup data using the share token ---
+if (!isset($_POST['share_token']) && !isset($_POST['original_setup_id'])) {
+    die('No setup specified for import.');
+}
+$share_token = $_POST['share_token'] ?? null;
+$original_setup_id = null;
+$original_setup_data = null;
+
+if ($share_token) {
+    $stmt_orig = $pdo->prepare("SELECT s.*, m.name as model_name FROM setups s JOIN models m ON s.model_id = m.id WHERE s.share_token = ? AND s.is_public = 1");
+    $stmt_orig->execute([$share_token]);
+    $original_setup_data = $stmt_orig->fetch(PDO::FETCH_ASSOC);
+    if ($original_setup_data) {
+        $original_setup_id = $original_setup_data['id'];
+    }
+}
+
+if (!$original_setup_data) {
+    die('The setup you are trying to import could not be found or is not public.');
+}
+
+// --- 2. Handle the final import confirmation ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_import') {
+    // ... (The rest of the file remains the same) ...
+}
+
+
+// --- 3. Fetch data for the confirmation page display ---
+$stmt_my_models = $pdo->prepare("SELECT id, name FROM models WHERE user_id = ? ORDER BY name");
+$stmt_my_models->execute([$user_id]);
+$my_models = $stmt_my_models->fetchAll(PDO::FETCH_ASSOC);
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Import Setup Sheet</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<?php require 'header.php'; ?>
+<div class="container mt-3">
+    <h1>Import Setup Sheet</h1>
+    <p>You are about to import the following setup into your account. Please select which of your car models you would like to save it to.</p>
+
+    <div class="card bg-light mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><?php echo htmlspecialchars($original_setup_data['name']); ?></h5>
             <h6 class="card-subtitle mb-2 text-muted">From Model: <?php echo htmlspecialchars($original_setup_data['model_name']); ?></h6>
+        </div>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="action" value="confirm_import">
+        <input type="hidden" name="original_setup_id" value="<?php echo $original_setup_id; ?>">
+        
+        <div class="mb-3">
+            <label for="model_id" class="form-label"><strong>Select Your Target Model:</strong></label>
+            <select class="form-select" id="model_id" name="model_id" required>
+                <option value="">-- Choose one of your models --</option>
+                <?php foreach ($my_models as $model): ?>
+                    <option value="<?php echo $model['id']; ?>"><?php echo htmlspecialchars($model['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Confirm Import</button>
+        <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>ed">From Model: <?php echo htmlspecialchars($original_setup_data['model_name']); ?></h6>
         </div>
     </div>
 
