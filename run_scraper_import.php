@@ -11,7 +11,7 @@ $driver_name_to_process = 'Paul Webb';
 $race_class_to_process = 'Mini BL';
 
 // --- IMPORTANT: Set the URL for your Python API ---
-$api_url = "http://<YOUR_PYTHON_SERVER_IP>:5000/scrape";
+$api_url = "http://109.155.110.165:5000/scrape";
 $api_url .= "?venueId=" . urlencode($venue_id_to_process);
 $api_url .= "&driverName=" . urlencode($driver_name_to_process);
 $api_url .= "&raceClass=" . urlencode($race_class_to_process);
