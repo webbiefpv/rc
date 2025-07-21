@@ -1,11 +1,104 @@
-body {
-    background-color: #f8f9fa;
+/* Tweak Lab - Dark Theme */
+
+/* 1. Define Color Palette using CSS Variables */
+:root {
+    --tl-bg: #212529; /* Main background */
+    --tl-surface: #2c3034; /* Card and surface background */
+    --tl-border: #495057; /* Borders for cards, inputs */
+    --tl-text: #f8f9fa; /* Primary text color */
+    --tl-text-muted: #adb5bd; /* Muted text color */
+    --tl-primary: #0d6efd; /* Bootstrap blue for accents */
+    --tl-primary-hover: #0b5ed7;
 }
 
-h1, h2, h3 {
-    color: #343a40;
+/* 2. Apply Base Styles */
+body {
+    background-color: var(--tl-bg);
+    color: var(--tl-text);
 }
 
 .container {
     max-width: 1200px;
+}
+
+/* 3. Theme Components */
+
+/* Cards */
+.card {
+    background-color: var(--tl-surface);
+    border: 1px solid var(--tl-border);
+}
+
+/* Tables */
+.table {
+    --bs-table-color: var(--tl-text);
+    --bs-table-bg: var(--tl-surface);
+    --bs-table-border-color: var(--tl-border);
+    --bs-table-striped-color: var(--tl-text);
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.03);
+    --bs-table-hover-color: var(--tl-text);
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.05);
+}
+
+/* Accordions */
+.accordion-item {
+    background-color: var(--tl-surface);
+    border: 1px solid var(--tl-border);
+}
+.accordion-button {
+    background-color: #343a40;
+    color: var(--tl-text);
+}
+.accordion-button:not(.collapsed) {
+    background-color: var(--tl-primary);
+    color: white;
+}
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.accordion-button::after {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Forms */
+.form-control, .form-select {
+    background-color: #343a40;
+    color: var(--tl-text);
+    border: 1px solid var(--tl-border);
+}
+.form-control:focus, .form-select:focus {
+    background-color: #343a40;
+    color: var(--tl-text);
+    border-color: var(--tl-primary);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.form-check-input:checked {
+    background-color: var(--tl-primary);
+    border-color: var(--tl-primary);
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--tl-primary);
+    border-color: var(--tl-primary);
+}
+.btn-primary:hover {
+    background-color: var(--tl-primary-hover);
+    border-color: var(--tl-primary-hover);
+}
+
+/* Links */
+a {
+    color: var(--bs-link-color);
+}
+a:hover {
+    color: var(--bs-link-hover-color);
+}
+
+/* Specific overrides for light elements */
+.bg-light {
+    background-color: var(--tl-surface) !important;
+}
+.border {
+    border-color: var(--tl-border) !important;
 }
