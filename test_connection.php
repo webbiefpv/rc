@@ -1,7 +1,7 @@
 <?php
 // --- CONFIGURATION ---
 // Make sure this is the correct public IP address of your home network where the Python server is.
-$api_url = "http://109.155.110.165:8080/scrape"; 
+$api_url = "http://109.155.110.165:5000/scrape"; 
 
 echo "<h1>Connection Test</h1>";
 echo "<p>Attempting to connect to: <strong>" . htmlspecialchars($api_url) . "</strong></p>";
