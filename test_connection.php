@@ -1,31 +1,50 @@
 <?php
 // --- CONFIGURATION ---
-// Make sure this is the correct public IP address of your home network where the Python server is.
 $api_url = "http://109.155.110.165/scrape"; 
 
-echo "<h1>Connection Test</h1>";
+echo "<h1>Connection Test (using cURL)</h1>";
 echo "<p>Attempting to connect to: <strong>" . htmlspecialchars($api_url) . "</strong></p>";
 
-// Use file_get_contents with a timeout to test the connection
-$context = stream_context_create(['http' => ['timeout' => 5]]); // Set a 5-second timeout
-$response = @file_get_contents($api_url, false, $context);
+// Initialize cURL
+$ch = curl_init();
 
-if ($response === false) {
+// Set cURL options
+curl_setopt($ch, CURLOPT_URL, $api_url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // Return the response as a string
+curl_setopt($ch, CURLOPT_TIMEOUT, 10); // Set a 10-second timeout
+// --- THIS IS THE CRITICAL LINE ---
+// Set a user-agent to make it look like a real browser
+curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+// Execute the request
+$response = curl_exec($ch);
+
+// Check for errors
+if (curl_errno($ch)) {
     echo '<div style="color: red; font-weight: bold; border: 2px solid red; padding: 10px;">';
-    echo "TEST FAILED: Could not connect to the API server.<br>";
-    echo "This confirms there is a network or firewall issue preventing your web server from reaching your Python server.";
+    echo "TEST FAILED: cURL Error.<br>";
+    echo "This means there is still a network or firewall issue.";
+    echo "<p><strong>Error details:</strong> " . htmlspecialchars(curl_error($ch)) . "</p>";
     echo '</div>';
-    
-    $error = error_get_last();
-    if ($error) {
-        echo "<p><strong>Error details:</strong> " . htmlspecialchars($error['message']) . "</p>";
-    }
-
 } else {
-    echo '<div style="color: green; font-weight: bold; border: 2px solid green; padding: 10px;">';
-    echo "TEST SUCCESSFUL: The connection was made successfully!";
-    echo '</div>';
-    echo "<h4>Response from API:</h4>";
-    echo "<pre>" . htmlspecialchars($response) . "</pre>";
+    // Check the HTTP status code
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if ($http_code == 200) {
+        echo '<div style="color: green; font-weight: bold; border: 2px solid green; padding: 10px;">';
+        echo "TEST SUCCESSFUL: The connection was made and received a 200 OK response!";
+        echo '</div>';
+        echo "<h4>Response from API:</h4>";
+        echo "<pre>" . htmlspecialchars($response) . "</pre>";
+    } else {
+        echo '<div style="color: orange; font-weight: bold; border: 2px solid orange; padding: 10px;">';
+        echo "TEST FAILED: Connected, but received a non-200 HTTP status code: " . $http_code;
+        echo "<p>This means the API server responded with an error.</p>";
+        echo "<h4>Response from API:</h4>";
+        echo "<pre>" . htmlspecialchars($response) . "</pre>";
+        echo '</div>';
+    }
 }
+
+// Close cURL
+curl_close($ch);
 ?>
