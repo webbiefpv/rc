@@ -35,16 +35,15 @@ if (!$data || !isset($data['latest_event']['event_name']) || empty($data['latest
     die("Error: Received invalid or empty data from the scraper API.\n");
 }
 
-// --- NEW LOGIC: Find the local track ID that matches the official venue ID ---
+// Find the local track ID that matches the official venue ID
 $stmt_track = $pdo->prepare("SELECT id FROM tracks WHERE official_venue_id = ? AND user_id = ?");
 $stmt_track->execute([$venue_id_to_process, $user_id_to_process]);
 $local_track_id = $stmt_track->fetchColumn();
 
 if (!$local_track_id) {
-    die("Error: No track found in your app with the Official Venue ID: " . htmlspecialchars($venue_id_to_process) . ". Please edit the track on the Tracks page and add the correct ID.\n");
+    die("Error: No track found in your app with the Official Venue ID: " . htmlspecialchars($venue_id_to_process) . ".\n");
 }
 echo "Found matching local track with ID: $local_track_id\n";
-
 
 // 2. Process and save the data to the database
 $event_name = $data['latest_event']['event_name'];
@@ -57,7 +56,7 @@ $event_date_for_db = $date_obj->format('Y-m-d');
 
 $pdo->beginTransaction();
 try {
-    // Check if this event already exists to prevent duplicates
+    // Check if this event already exists
     $stmt_check = $pdo->prepare("SELECT id FROM race_events WHERE user_id = ? AND event_name = ? AND event_date = ?");
     $stmt_check->execute([$user_id_to_process, $event_name, $event_date_for_db]);
     if ($stmt_check->fetch()) {
@@ -66,7 +65,7 @@ try {
         exit;
     }
 
-    // Insert the new Race Event using the correct local track ID
+    // Insert the new Race Event
     $stmt_event = $pdo->prepare("INSERT INTO race_events (user_id, event_name, event_date, track_id) VALUES (?, ?, ?, ?)");
     $stmt_event->execute([$user_id_to_process, $event_name, $event_date_for_db, $local_track_id]);
     $new_event_id = $pdo->lastInsertId();
@@ -78,9 +77,10 @@ try {
             INSERT INTO race_logs (user_id, event_id, track_id, setup_id, race_date, event_type, laps_completed, total_race_time, best_lap_time, best_10_avg, best_3_consecutive_avg, finishing_position)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        // Use the correct local track ID and a default setup_id of 0
+        // --- THIS IS THE FIX ---
+        // We now pass NULL for the setup_id, which the database now allows.
         $stmt_log->execute([
-            $user_id_to_process, $new_event_id, $local_track_id, 0, 
+            $user_id_to_process, $new_event_id, $local_track_id, null, 
             $event_date_for_db, $race['race_name'], $race['laps'], $race['total_time'], 
             $race['best_lap'], $race['best_10_avg'], $race['best_3_consecutive'], $race['position']
         ]);
@@ -101,7 +101,16 @@ try {
     
     // Update championship standings
     if (!empty($data['championship'])) {
-        // ... (championship logic remains the same) ...
+        $champ_data = $data['championship'];
+        $stmt_champ = $pdo->prepare("
+            INSERT INTO championship_standings (user_id, venue_id, championship_name, position, points_details)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                position = VALUES(position),
+                points_details = VALUES(points_details)
+        ");
+        $stmt_champ->execute([$user_id_to_process, $venue_id_to_process, $event_name, $champ_data['position'], $champ_data['points']]);
+        echo "Updated championship standings.\n";
     }
 
     $pdo->commit();
