@@ -21,6 +21,14 @@
 				<li class="nav-item">
 					<a class="nav-link" href="events.php">Race Events</a>
 				</li>
+				<li class="nav-item">
+					<a class="nav-link" href="venues.php">Venues</a>
+				</li>
+
+				<li class="nav-item">
+					<a class="nav-link" href="tracks.php">Tracks</a>
+				</li>
+
                 <li class="nav-item">
                     <a class="nav-link" href="analysis.php">Analysis</a>
                 </li>
