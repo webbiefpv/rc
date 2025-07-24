@@ -104,11 +104,11 @@ $stmt_importable_venues->execute([$user_id]);
 $importable_venues = $stmt_importable_venues->fetchAll();
 
 // --- THIS IS THE CORRECTED QUERY ---
-// It now correctly uses LEFT JOIN for the tracks table to prevent errors.
+// It now uses LEFT JOIN for both venues and tracks to ensure ALL events are always displayed.
 $stmt_events = $pdo->prepare("
     SELECT e.*, t.name as track_name, v.name as venue_name 
     FROM race_events e 
-    JOIN venues v ON e.venue_id = v.id 
+    LEFT JOIN venues v ON e.venue_id = v.id 
     LEFT JOIN tracks t ON e.track_id = t.id 
     WHERE e.user_id = ? 
     ORDER BY e.event_date DESC
@@ -172,7 +172,7 @@ $events_list = $stmt_events->fetchAll();
                         <small><?php echo date("D, M j, Y", strtotime($event['event_date'])); ?></small>
                     </div>
                     <p class="mb-1">
-                        Venue: <?php echo htmlspecialchars($event['venue_name'] ?? 'Venue Not Found'); ?> | 
+                        Venue: <?php echo htmlspecialchars($event['venue_name'] ?? 'Venue Not Assigned'); ?> | 
                         Layout: 
                         <?php if ($event['track_id']): ?>
                             <span class="fw-bold"><?php echo htmlspecialchars($event['track_name']); ?></span>
