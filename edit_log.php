@@ -50,24 +50,32 @@ $lap_times = $stmt_laps->fetchAll(PDO::FETCH_ASSOC);
 $slowest_lap_value = null;
 $best_consec_laps = []; // Array to hold the lap numbers of the best 3 consecutive laps
 
-if (!empty($lap_times)) {
+if (count($lap_times) > 1) {
     $lap_time_values_float = array_map('floatval', array_column($lap_times, 'lap_time'));
-    $slowest_lap_value = max($lap_time_values_float);
     
-    // Find the best 3 consecutive laps that match the recorded total
-    $target_consec3_sum = floatval($log['best_3_consecutive_avg']);
-    if ($target_consec3_sum > 0 && count($lap_time_values_float) >= 3) {
+    // Find the slowest lap, ignoring the first lap
+    $laps_after_first = array_slice($lap_time_values_float, 1);
+    if (!empty($laps_after_first)) {
+        $slowest_lap_value = max($laps_after_first);
+    }
+    
+    // Find the best 3 consecutive laps by calculating from the list
+    if (count($lap_time_values_float) >= 3) {
+        $best_sum = PHP_FLOAT_MAX;
+        $best_index = -1;
         for ($i = 0; $i <= count($lap_time_values_float) - 3; $i++) {
             $current_sum = $lap_time_values_float[$i] + $lap_time_values_float[$i+1] + $lap_time_values_float[$i+2];
-            // Use a small tolerance for floating point comparison
-            if (abs($current_sum - $target_consec3_sum) < 0.01) {
-                $best_consec_laps = [
-                    $lap_times[$i]['lap_number'],
-                    $lap_times[$i+1]['lap_number'],
-                    $lap_times[$i+2]['lap_number']
-                ];
-                break; // Stop once we find the first match
+            if ($current_sum < $best_sum) {
+                $best_sum = $current_sum;
+                $best_index = $i;
             }
+        }
+        if ($best_index !== -1) {
+            $best_consec_laps = [
+                $lap_times[$best_index]['lap_number'],
+                $lap_times[$best_index+1]['lap_number'],
+                $lap_times[$best_index+2]['lap_number']
+            ];
         }
     }
 }
@@ -166,13 +174,13 @@ foreach ($lap_times as $lap) {
                                     $current_lap_number = intval($lap['lap_number']);
                                     $row_class = '';
                                     
-                                    // Use a small tolerance for comparing the official best lap
-                                    if (abs($current_lap_float - floatval($log['best_lap_time'])) < 0.001) {
+                                    // Use a safer comparison for the official best lap
+                                    if (number_format($current_lap_float, 2) == number_format(floatval($log['best_lap_time']), 2)) {
                                         $row_class = 'table-success fw-bold'; // Official Best Lap
                                     } elseif (in_array($current_lap_number, $best_consec_laps)) {
                                         $row_class = 'table-info'; // Best 3 Consecutive
-                                    } elseif ($current_lap_float == $slowest_lap_value) {
-                                        $row_class = 'table-danger'; // Slowest Lap
+                                    } elseif ($current_lap_float == $slowest_lap_value && $current_lap_number > 1) {
+                                        $row_class = 'table-danger'; // Slowest Lap (ignoring lap 1)
                                     }
                                 ?>
                                 <tr class="<?php echo $row_class; ?>">
