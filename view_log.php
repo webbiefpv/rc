@@ -37,7 +37,6 @@ $stmt_log->execute([$log_id, $user_id]);
 $log = $stmt_log->fetch(PDO::FETCH_ASSOC);
 
 if (!$log) {
-    // Log not found or doesn't belong to the user
     header('Location: events.php?error=lognotfound');
     exit;
 }
@@ -47,15 +46,58 @@ $stmt_laps = $pdo->prepare("SELECT lap_number, lap_time FROM race_lap_times WHER
 $stmt_laps->execute([$log_id]);
 $lap_times = $stmt_laps->fetchAll(PDO::FETCH_ASSOC);
 
-// --- NEW: Find the fastest and slowest lap times ---
-$fastest_lap_value = null;
-$slowest_lap_value = null;
-if (!empty($lap_times)) {
-    $lap_time_values = array_column($lap_times, 'lap_time');
-    // Convert to float for accurate comparison
-    $lap_time_values_float = array_map('floatval', $lap_time_values);
-    $fastest_lap_value = min($lap_time_values_float);
-    $slowest_lap_value = max($lap_time_values_float);
+// --- NEW, ROBUST LAP ANALYSIS ---
+$fastest_lap_number = null;
+$slowest_lap_number = null;
+$best_consec_laps = []; // Array to hold the lap numbers of the best 3 consecutive laps
+
+if (count($lap_times) > 1) {
+    // IMPORTANT: Ignore the first lap for all analysis by creating a new array
+    $laps_for_analysis = array_slice($lap_times, 1); 
+    
+    if (!empty($laps_for_analysis)) {
+        // Find the lap that matches the official best lap time
+        $official_best_lap = floatval($log['best_lap_time']);
+        foreach ($laps_for_analysis as $lap) {
+            // Use a small tolerance for comparing floating point numbers
+            if (abs(floatval($lap['lap_time']) - $official_best_lap) < 0.001) {
+                $fastest_lap_number = intval($lap['lap_number']);
+                break; // Stop once we find the first match
+            }
+        }
+
+        // Find the slowest lap (from the analysis list which already excludes lap 1)
+        $slowest_lap_value = -1;
+        foreach ($laps_for_analysis as $lap) {
+            $current_lap_float = floatval($lap['lap_time']);
+            if ($current_lap_float > $slowest_lap_value) {
+                $slowest_lap_value = $current_lap_float;
+                $slowest_lap_number = intval($lap['lap_number']);
+            }
+        }
+        
+        // Calculate the best 3 consecutive laps from the list (ignoring lap 1)
+        if (count($laps_for_analysis) >= 3) {
+            $best_sum = PHP_FLOAT_MAX;
+            $best_index = -1;
+            $analysis_laps_float = array_map('floatval', array_column($laps_for_analysis, 'lap_time'));
+
+            for ($i = 0; $i <= count($analysis_laps_float) - 3; $i++) {
+                $current_sum = $analysis_laps_float[$i] + $analysis_laps_float[$i+1] + $analysis_laps_float[$i+2];
+                if ($current_sum < $best_sum) {
+                    $best_sum = $current_sum;
+                    $best_index = $i;
+                }
+            }
+            if ($best_index !== -1) {
+                $best_consec_laps = [
+                    intval($laps_for_analysis[$best_index]['lap_number']),
+                    intval($laps_for_analysis[$best_index+1]['lap_number']),
+                    intval($laps_for_analysis[$best_index+2]['lap_number'])
+                ];
+            }
+        }
+    }
 }
 
 // 3. Prepare the data for Chart.js
@@ -90,12 +132,8 @@ foreach ($lap_times as $lap) {
     <!-- Lap Time Chart -->
     <?php if (!empty($lap_times)): ?>
     <div class="card mb-4">
-        <div class="card-header">
-            <h5>Lap Time Analysis</h5>
-        </div>
-        <div class="card-body">
-            <canvas id="lapChart"></canvas>
-        </div>
+        <div class="card-header"><h5>Lap Time Analysis</h5></div>
+        <div class="card-body"><canvas id="lapChart"></canvas></div>
     </div>
     <?php endif; ?>
 
@@ -103,9 +141,7 @@ foreach ($lap_times as $lap) {
     <div class="row">
         <div class="col-lg-8 mb-4">
             <div class="card h-100">
-                <div class="card-header">
-                    <h5>Session Details</h5>
-                </div>
+                <div class="card-header"><h5>Session Details</h5></div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
@@ -147,22 +183,22 @@ foreach ($lap_times as $lap) {
         <div class="col-lg-4 mb-4">
             <?php if (!empty($lap_times)): ?>
             <div class="card h-100">
-                <div class="card-header">
-                    <h5>Individual Lap Times</h5>
-                </div>
+                <div class="card-header"><h5>Individual Lap Times</h5></div>
                 <div class="card-body" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-sm table-striped">
                         <thead><tr><th>Lap</th><th>Time</th></tr></thead>
                         <tbody>
                             <?php foreach ($lap_times as $lap): ?>
                                 <?php
-                                    // --- NEW: Add styling for fastest/slowest laps ---
-                                    $current_lap_float = floatval($lap['lap_time']);
+                                    $current_lap_number = intval($lap['lap_number']);
                                     $row_class = '';
-                                    if ($current_lap_float == $fastest_lap_value) {
-                                        $row_class = 'table-success fw-bold';
-                                    } elseif ($current_lap_float == $slowest_lap_value) {
-                                        $row_class = 'table-danger';
+                                    
+                                    if ($current_lap_number === $fastest_lap_number) {
+                                        $row_class = 'table-success fw-bold'; // Official Best Lap
+                                    } elseif (in_array($current_lap_number, $best_consec_laps)) {
+                                        $row_class = 'table-info'; // Best 3 Consecutive
+                                    } elseif ($current_lap_number === $slowest_lap_number) {
+                                        $row_class = 'table-danger'; // Slowest Lap (ignoring lap 1)
                                     }
                                 ?>
                                 <tr class="<?php echo $row_class; ?>">
