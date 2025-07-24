@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // Handle ADDING a new log
     if ($_POST['action'] === 'add_log') {
-        $setup_id = intval($_POST['setup_id']);
+        $setup_id = !empty($_POST['setup_id']) ? intval($_POST['setup_id']) : null;
         $front_tires_id = !empty($_POST['front_tires_id']) ? intval($_POST['front_tires_id']) : null;
         $rear_tires_id = !empty($_POST['rear_tires_id']) ? intval($_POST['rear_tires_id']) : null;
         $race_time = trim($_POST['race_time']);
@@ -84,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $car_performance_notes = trim($_POST['car_performance_notes']);
         $lap_times_pasted = trim($_POST['lap_times']);
 
-        if (empty($setup_id) || empty($event_type)) {
-            $message = '<div class="alert alert-danger">Please select a Setup and Event Type.</div>';
+        if (empty($event_type)) {
+            $message = '<div class="alert alert-danger">Please select an Event Type.</div>';
         } else {
             $pdo->beginTransaction();
             try {
@@ -138,7 +138,7 @@ $stmt_setups = $pdo->prepare("SELECT s.id, s.name as setup_name, m.name as model
 $stmt_setups->execute([$user_id]);
 $setups_list = $stmt_setups->fetchAll(PDO::FETCH_ASSOC);
 
-$stmt_layouts = $pdo->prepare("SELECT id, name FROM tracks WHERE venue_id = ? AND user_id = ? ORDER BY name");
+$stmt_layouts = $pdo->prepare("SELECT id, name, track_image_url FROM tracks WHERE venue_id = ? AND user_id = ? ORDER BY name");
 $stmt_layouts->execute([$event['venue_id'], $user_id]);
 $layouts_list = $stmt_layouts->fetchAll(PDO::FETCH_ASSOC);
 
@@ -193,18 +193,27 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
             <?php else: ?>
                 <form method="POST">
                     <input type="hidden" name="action" value="assign_layout">
-                    <div class="row align-items-end">
-                        <div class="col-md-8">
-                            <label for="track_id" class="form-label">Assign a Track Layout to this Event:</label>
-                            <select class="form-select" name="track_id" id="track_id" required>
-                                <option value="">-- Select a layout for <?php echo htmlspecialchars($event['venue_name']); ?> --</option>
-                                <?php foreach ($layouts_list as $layout): ?>
-                                    <option value="<?php echo $layout['id']; ?>"><?php echo htmlspecialchars($layout['name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <img id="layout-preview" src="https://via.placeholder.com/150?text=Select+Layout" class="img-fluid rounded" alt="Layout Preview">
                         </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-primary w-100">Assign Layout</button>
+                        <div class="col-md-9">
+                             <div class="row align-items-end">
+                                <div class="col-md-8">
+                                    <label for="track_id" class="form-label">Assign a Track Layout to this Event:</label>
+                                    <select class="form-select" name="track_id" id="track_id" required onchange="updateLayoutPreview(this)">
+                                        <option value="" data-image-url="https://via.placeholder.com/150?text=Select+Layout">-- Select a layout for <?php echo htmlspecialchars($event['venue_name']); ?> --</option>
+                                        <?php foreach ($layouts_list as $layout): ?>
+                                            <option value="<?php echo $layout['id']; ?>" data-image-url="<?php echo htmlspecialchars($layout['track_image_url'] ?? 'https://via.placeholder.com/150?text=No+Image'); ?>">
+                                                <?php echo htmlspecialchars($layout['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-primary w-100">Assign Layout</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -227,7 +236,7 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
                             <div class="col-md-4"><label for="event_category" class="form-label">Event Type</label><select class="form-select" id="event_category" name="event_category" required><option value="Practice" selected>Practice</option><option value="Qualifier">Qualifier</option><option value="Final">Final</option></select></div>
                             <div class="col-md-2" id="qualifier_round_div" style="display: none;"><label for="round_number" class="form-label">Round #</label><input type="number" class="form-control" id="round_number" name="round_number" min="1" value="1"></div>
                             <div class="col-md-2" id="final_letter_div" style="display: none;"><label for="final_letter" class="form-label">Final</label><input type="text" class="form-control" id="final_letter" name="final_letter" placeholder="e.g., A, B..." maxlength="2"></div>
-                            <div class="col-md-4"><label for="setup_id" class="form-label">Setup Used</label><select class="form-select" id="setup_id" name="setup_id" required><option value="">-- Select a setup --</option><?php foreach ($setups_list as $setup): ?><option value="<?php echo $setup['id']; ?>"><?php echo htmlspecialchars($setup['model_name'] . ' - ' . $setup['setup_name']); ?><?php echo $setup['is_baseline'] ? ' ⭐' : ''; ?></option><?php endforeach; ?></select></div>
+                            <div class="col-md-4"><label for="setup_id" class="form-label">Setup Used</label><select class="form-select" id="setup_id" name="setup_id"><option value="">-- Select a setup (Optional) --</option><?php foreach ($setups_list as $setup): ?><option value="<?php echo $setup['id']; ?>"><?php echo htmlspecialchars($setup['model_name'] . ' - ' . $setup['setup_name']); ?><?php echo $setup['is_baseline'] ? ' ⭐' : ''; ?></option><?php endforeach; ?></select></div>
                             <div class="col-md-4"><label for="front_tires_id" class="form-label">Front Tire Set</label><select class="form-select" id="front_tires_id" name="front_tires_id"><option value="">-- Select Front Tires --</option><?php foreach ($tires_list as $tire_set): ?><option value="<?php echo $tire_set['id']; ?>"><?php echo htmlspecialchars($tire_set['set_name']); ?></option><?php endforeach; ?></select></div>
                             <div class="col-md-4"><label for="rear_tires_id" class="form-label">Rear Tire Set</label><select class="form-select" id="rear_tires_id" name="rear_tires_id"><option value="">-- Select Rear Tires --</option><?php foreach ($tires_list as $tire_set): ?><option value="<?php echo $tire_set['id']; ?>"><?php echo htmlspecialchars($tire_set['set_name']); ?></option><?php endforeach; ?></select></div>
                             <div class="col-md-4"><label for="race_time" class="form-label">Time of Race</label><input type="time" class="form-control" id="race_time" name="race_time" required></div>
@@ -253,15 +262,28 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
     <div class="table-responsive">
         <table class="table table-striped table-hover align-middle">
             <thead>
-                <tr><th>Session</th><th>Setup Used</th><th>Tires Used</th><th>Result</th><th>Best Lap</th><th>Notes</th><th>Actions</th></tr>
+                <tr>
+                    <th>Session</th>
+                    <th>Setup Used</th>
+                    <th>Tires Used</th>
+                    <th>Result</th>
+                    <th>Best Lap</th>
+                    <th>Best 10 Avg</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                </tr>
             </thead>
             <tbody>
                 <?php if (empty($race_logs)): ?>
-                    <tr><td colspan="7" class="text-center">No sessions logged for this event yet.</td></tr>
+                    <tr><td colspan="8" class="text-center">No sessions logged for this event yet.</td></tr>
                 <?php else: ?>
                     <?php foreach ($race_logs as $log): ?>
                         <tr>
-                            <td><a href="view_log.php?log_id=<?php echo $log['id']; ?>"><strong><?php echo htmlspecialchars($log['event_type']); ?></strong><br><small><?php echo date("g:i a", strtotime($log['race_date'])); ?></small></a></td>
+                            <td>
+                                <a href="view_log.php?log_id=<?php echo $log['id']; ?>">
+                                    <strong><?php echo htmlspecialchars($log['event_type']); ?></strong>
+                                </a>
+                            </td>
                             <td>
                                 <?php if ($log['setup_id']): ?>
                                     <a href="setup_form.php?setup_id=<?php echo $log['setup_id']; ?>"><?php echo htmlspecialchars($log['model_name'] . ' - ' . $log['setup_name']); ?></a>
@@ -272,6 +294,7 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
                             <td style="font-size: 0.8rem;"><?php if($log['front_tire_name']) echo '<strong>F:</strong> ' . htmlspecialchars($log['front_tire_name']); ?><?php if($log['rear_tire_name']) echo '<br><strong>R:</strong> ' . htmlspecialchars($log['rear_tire_name']); ?></td>
                             <td><?php echo ($log['laps_completed'] ? $log['laps_completed'] . ' / ' . $log['total_race_time'] : 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars($log['best_lap_time'] ?: 'N/A'); ?></td>
+                            <td><?php echo htmlspecialchars($log['best_10_avg'] ?: 'N/A'); ?></td>
                             <td style="font-size: 0.8rem;"><?php if(!empty($log['car_performance_notes'])) { echo '<strong>Car:</strong> ' . nl2br(htmlspecialchars($log['car_performance_notes'])); } ?></td>
                             <td>
                                 <a href="edit_log.php?log_id=<?php echo $log['id']; ?>" class="btn btn-sm btn-outline-primary">Edit</a>
@@ -285,6 +308,11 @@ $race_logs = $stmt_logs->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 <script>
+function updateLayoutPreview(selectElement) {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const imageUrl = selectedOption.getAttribute('data-image-url');
+    document.getElementById('layout-preview').src = imageUrl;
+}
 document.addEventListener('DOMContentLoaded', function() {
     const eventCategorySelect = document.getElementById('event_category');
     const qualifierDiv = document.getElementById('qualifier_round_div');
