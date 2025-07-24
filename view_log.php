@@ -17,14 +17,20 @@ $stmt_log = $pdo->prepare("
     SELECT 
         rl.*, 
         e.event_name, e.event_date,
+        v.name as venue_name,
         t.name as track_name, t.track_image_url,
         s.name as setup_name, s.is_baseline,
-        m.name as model_name
+        m.name as model_name,
+        front_tires.set_name as front_tire_name,
+        rear_tires.set_name as rear_tire_name
     FROM race_logs rl
     JOIN race_events e ON rl.event_id = e.id
-    JOIN tracks t ON rl.track_id = t.id
-    JOIN setups s ON rl.setup_id = s.id
-    JOIN models m ON s.model_id = m.id
+    JOIN venues v ON e.venue_id = v.id
+    LEFT JOIN tracks t ON rl.track_id = t.id
+    LEFT JOIN setups s ON rl.setup_id = s.id
+    LEFT JOIN models m ON s.model_id = m.id
+    LEFT JOIN tire_inventory front_tires ON rl.front_tires_id = front_tires.id
+    LEFT JOIN tire_inventory rear_tires ON rl.rear_tires_id = rear_tires.id
     WHERE rl.id = ? AND rl.user_id = ?
 ");
 $stmt_log->execute([$log_id, $user_id]);
@@ -48,7 +54,6 @@ foreach ($lap_times as $lap) {
     $chart_labels[] = "Lap " . $lap['lap_number'];
     $chart_data[] = floatval($lap['lap_time']);
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -65,23 +70,25 @@ foreach ($lap_times as $lap) {
 <div class="container mt-3">
 
     <h3>
-        <a href="view_event.php?event_id=<?php echo $log['event_id']; ?>" class="text-decoration-none"><?php echo htmlspecialchars($log['event_name']); ?></a>
-        <span class="text-muted">/</span>
+        <a href="view_event.php?event_id=<?php echo $log['event_id']; ?>" class="text-decoration-none"><?php echo htmlspecialchars($log['event_name']); ?></a> 
+        <span class="text-muted">/</span> 
         <?php echo htmlspecialchars($log['event_type']); ?>
     </h3>
     <hr>
-
+    
+    <!-- Lap Time Chart -->
     <?php if (!empty($lap_times)): ?>
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5>Lap Time Analysis</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="lapChart"></canvas>
-            </div>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Lap Time Analysis</h5>
         </div>
+        <div class="card-body">
+            <canvas id="lapChart"></canvas>
+        </div>
+    </div>
     <?php endif; ?>
 
+    <!-- Log Details -->
     <div class="card">
         <div class="card-header">
             <h5>Session Details</h5>
@@ -101,7 +108,19 @@ foreach ($lap_times as $lap) {
                 <div class="col-md-6">
                     <h6>Setup & Conditions</h6>
                     <ul class="list-group">
-                        <li class="list-group-item"><strong>Setup Used:</strong> <a href="setup_form.php?setup_id=<?php echo $log['setup_id']; ?>"><?php echo htmlspecialchars($log['model_name'] . ' - ' . $log['setup_name']); ?></a></li>
+                        <li class="list-group-item"><strong>Setup Used:</strong> 
+                            <?php if ($log['setup_id']): ?>
+                                <a href="setup_form.php?setup_id=<?php echo $log['setup_id']; ?>"><?php echo htmlspecialchars($log['model_name'] . ' - ' . $log['setup_name']); ?></a>
+                            <?php else: ?>
+                                Not Assigned
+                            <?php endif; ?>
+                        </li>
+                        <li class="list-group-item"><strong>Tires:</strong><br>
+                            <small>
+                                <?php if($log['front_tire_name']) echo '<strong>Front:</strong> ' . htmlspecialchars($log['front_tire_name']); ?>
+                                <?php if($log['rear_tire_name']) echo '<br><strong>Rear:</strong> ' . htmlspecialchars($log['rear_tire_name']); ?>
+                            </small>
+                        </li>
                         <li class="list-group-item"><strong>Car Notes:</strong><br><?php echo nl2br(htmlspecialchars($log['car_performance_notes'] ?: 'N/A')); ?></li>
                         <li class="list-group-item"><strong>Track Notes:</strong><br><?php echo nl2br(htmlspecialchars($log['track_conditions_notes'] ?: 'N/A')); ?></li>
                     </ul>
@@ -110,66 +129,65 @@ foreach ($lap_times as $lap) {
         </div>
     </div>
 
+    <!-- Individual Lap Times Table -->
     <?php if (!empty($lap_times)): ?>
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5>Individual Lap Times</h5>
-            </div>
-            <div class="card-body">
-                <table class="table table-sm table-striped">
-                    <thead><tr><th>Lap</th><th>Time</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($lap_times as $lap): ?>
-                        <tr>
-                            <td><?php echo $lap['lap_number']; ?></td>
-                            <td><?php echo $lap['lap_time']; ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5>Individual Lap Times</h5>
         </div>
+        <div class="card-body">
+            <table class="table table-sm table-striped">
+                <thead><tr><th>Lap</th><th>Time</th></tr></thead>
+                <tbody>
+                    <?php foreach ($lap_times as $lap): ?>
+                    <tr>
+                        <td><?php echo $lap['lap_number']; ?></td>
+                        <td><?php echo $lap['lap_time']; ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
     <?php endif; ?>
 
 </div>
 
+<!-- JavaScript for the Chart -->
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const lapData = <?php echo json_encode($chart_data); ?>;
-        const lapLabels = <?php echo json_encode($chart_labels); ?>;
-
-        if (lapData.length > 0) {
-            const ctx = document.getElementById('lapChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: lapLabels,
-                    datasets: [{
-                        label: 'Lap Time (seconds)',
-                        data: lapData,
-                        borderColor: 'rgb(75, 192, 192)',
-                        tension: 0.1,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            title: { display: true, text: 'Time (s)' },
-                            ticks: {
-                                // To make the chart more readable, we can reverse it so lower (faster) times are at the top
-                                // However, standard is lower values at the bottom. Let's stick to standard for now.
-                            }
-                        },
-                        x: {
-                            title: { display: true, text: 'Lap Number' }
-                        }
+document.addEventListener('DOMContentLoaded', function() {
+    const lapData = <?php echo json_encode($chart_data); ?>;
+    const lapLabels = <?php echo json_encode($chart_labels); ?>;
+    
+    if (lapData.length > 0) {
+        const ctx = document.getElementById('lapChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: lapLabels,
+                datasets: [{
+                    label: 'Lap Time (seconds)',
+                    data: lapData,
+                    borderColor: 'rgb(13, 110, 253)',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        title: { display: true, text: 'Time (s) - Faster is higher' },
+                        reverse: true
+                    },
+                    x: {
+                         title: { display: true, text: 'Lap Number' }
                     }
                 }
-            });
-        }
-    });
+            }
+        });
+    }
+});
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
