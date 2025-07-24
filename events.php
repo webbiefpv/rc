@@ -103,8 +103,7 @@ $stmt_importable_venues = $pdo->prepare("SELECT id, name, official_venue_id FROM
 $stmt_importable_venues->execute([$user_id]);
 $importable_venues = $stmt_importable_venues->fetchAll();
 
-// --- THIS IS THE CORRECTED QUERY ---
-// It now uses LEFT JOIN for the venues table to ensure ALL events are always displayed.
+// Fetch all existing Race Events to display in the list
 $stmt_events = $pdo->prepare("
     SELECT e.*, t.name as track_name, v.name as venue_name 
     FROM race_events e 
