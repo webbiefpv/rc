@@ -27,8 +27,9 @@ $event_id = $log_check['event_id']; // Get the event_id for redirects
 // 2. Handle form submission to UPDATE the log
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_log') {
     // Collect all data from the form
-    $setup_id = intval($_POST['setup_id']);
-    // ... (logic to construct event_type from dynamic inputs)
+    $setup_id = !empty($_POST['setup_id']) ? intval($_POST['setup_id']) : null;
+    $front_tires_id = !empty($_POST['front_tires_id']) ? intval($_POST['front_tires_id']) : null;
+    $rear_tires_id = !empty($_POST['rear_tires_id']) ? intval($_POST['rear_tires_id']) : null;
     $laps_completed = !empty($_POST['laps_completed']) ? intval($_POST['laps_completed']) : null;
     $total_race_time = trim($_POST['total_race_time']) ?: null;
     $best_lap_time = trim($_POST['best_lap_time']) ?: null;
@@ -44,12 +45,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // --- Update the main race_logs table ---
         $stmt_update_log = $pdo->prepare("
             UPDATE race_logs SET 
-                setup_id = ?, laps_completed = ?, total_race_time = ?, best_lap_time = ?, 
-                best_10_avg = ?, best_3_consecutive_avg = ?, finishing_position = ?, 
-                track_conditions_notes = ?, car_performance_notes = ?
+                setup_id = ?, front_tires_id = ?, rear_tires_id = ?, laps_completed = ?, 
+                total_race_time = ?, best_lap_time = ?, best_10_avg = ?, best_3_consecutive_avg = ?, 
+                finishing_position = ?, track_conditions_notes = ?, car_performance_notes = ?
             WHERE id = ? AND user_id = ?
         ");
-        $stmt_update_log->execute([$setup_id, $laps_completed, $total_race_time, $best_lap_time, $best_10_avg, $best_3_consecutive_avg, $finishing_position, $track_conditions_notes, $car_performance_notes, $log_id, $user_id]);
+        $stmt_update_log->execute([$setup_id, $front_tires_id, $rear_tires_id, $laps_completed, $total_race_time, $best_lap_time, $best_10_avg, $best_3_consecutive_avg, $finishing_position, $track_conditions_notes, $car_performance_notes, $log_id, $user_id]);
+
+        // --- Sync the tire_log table (delete old, insert new) ---
+        $stmt_delete_tire_logs = $pdo->prepare("DELETE FROM tire_log WHERE race_log_id = ?");
+        $stmt_delete_tire_logs->execute([$log_id]);
+        
+        $stmt_insert_tire_log = $pdo->prepare("INSERT INTO tire_log (tire_set_id, race_log_id, user_id) VALUES (?, ?, ?)");
+        if ($front_tires_id) { $stmt_insert_tire_log->execute([$front_tires_id, $log_id, $user_id]); }
+        if ($rear_tires_id && $rear_tires_id !== $front_tires_id) { $stmt_insert_tire_log->execute([$rear_tires_id, $log_id, $user_id]); }
 
         // --- Sync the lap_times table (delete old, insert new) ---
         $stmt_delete_laps = $pdo->prepare("DELETE FROM race_lap_times WHERE race_log_id = ?");
@@ -66,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
         }
-
+        
         $pdo->commit();
         header("Location: view_event.php?event_id=" . $event_id . "&updated=1");
         exit;
@@ -87,12 +96,17 @@ $log_data = $stmt_log_details->fetch(PDO::FETCH_ASSOC);
 $stmt_lap_details = $pdo->prepare("SELECT lap_time FROM race_lap_times WHERE race_log_id = ? ORDER BY lap_number ASC");
 $stmt_lap_details->execute([$log_id]);
 $lap_times_array = $stmt_lap_details->fetchAll(PDO::FETCH_COLUMN);
-$lap_times_string = implode("\n", $lap_times_array); // Join with newlines for the textarea
+$lap_times_string = implode("\n", $lap_times_array);
 
 // Fetch setups for the dropdown
 $stmt_setups = $pdo->prepare("SELECT s.id, s.name as setup_name, m.name as model_name, s.is_baseline FROM setups s JOIN models m ON s.model_id = m.id WHERE m.user_id = ? ORDER BY m.name, s.is_baseline DESC, s.name");
 $stmt_setups->execute([$user_id]);
 $setups_list = $stmt_setups->fetchAll();
+
+// Fetch active tire sets for the dropdowns
+$stmt_tires = $pdo->prepare("SELECT id, set_name FROM tire_inventory WHERE user_id = ? AND is_retired = FALSE ORDER BY set_name");
+$stmt_tires->execute([$user_id]);
+$tires_list = $stmt_tires->fetchAll();
 
 ?>
 <!DOCTYPE html>
@@ -115,13 +129,36 @@ $setups_list = $stmt_setups->fetchAll();
     <form method="POST">
         <input type="hidden" name="action" value="edit_log">
         <div class="row g-3">
-            <div class="col-md-12">
+            <div class="col-md-4">
                 <label for="setup_id" class="form-label">Setup Used</label>
-                <select class="form-select" id="setup_id" name="setup_id" required>
+                <select class="form-select" id="setup_id" name="setup_id">
+                    <option value="">-- Not Assigned --</option>
                     <?php foreach ($setups_list as $setup): ?>
                         <option value="<?php echo $setup['id']; ?>" <?php echo ($setup['id'] == $log_data['setup_id']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($setup['model_name'] . ' - ' . $setup['setup_name']); ?>
                             <?php echo $setup['is_baseline'] ? ' ⭐' : ''; ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="front_tires_id" class="form-label">Front Tire Set</label>
+                <select class="form-select" id="front_tires_id" name="front_tires_id">
+                    <option value="">-- Not Assigned --</option>
+                    <?php foreach ($tires_list as $tire): ?>
+                        <option value="<?php echo $tire['id']; ?>" <?php echo ($tire['id'] == $log_data['front_tires_id']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($tire['set_name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="rear_tires_id" class="form-label">Rear Tire Set</label>
+                <select class="form-select" id="rear_tires_id" name="rear_tires_id">
+                    <option value="">-- Not Assigned --</option>
+                    <?php foreach ($tires_list as $tire): ?>
+                        <option value="<?php echo $tire['id']; ?>" <?php echo ($tire['id'] == $log_data['rear_tires_id']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($tire['set_name']); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -133,7 +170,7 @@ $setups_list = $stmt_setups->fetchAll();
             <div class="col-md-2"><label for="best_10_avg" class="form-label">Best 10 Avg</label><input type="text" class="form-control" id="best_10_avg" name="best_10_avg" value="<?php echo htmlspecialchars($log_data['best_10_avg']); ?>"></div>
             <div class="col-md-2"><label for="best_3_consecutive_avg" class="form-label">Best 3 Consec.</label><input type="text" class="form-control" id="best_3_consecutive_avg" name="best_3_consecutive_avg" value="<?php echo htmlspecialchars($log_data['best_3_consecutive_avg']); ?>"></div>
             <div class="col-md-2"><label for="finishing_position" class="form-label">Finishing Pos.</label><input type="number" class="form-control" id="finishing_position" name="finishing_position" value="<?php echo htmlspecialchars($log_data['finishing_position']); ?>"></div>
-
+            
             <div class="col-md-6">
                 <label for="track_conditions_notes" class="form-label">Track Conditions</label>
                 <textarea class="form-control" id="track_conditions_notes" name="track_conditions_notes" rows="3"><?php echo htmlspecialchars($log_data['track_conditions_notes']); ?></textarea>
@@ -142,7 +179,7 @@ $setups_list = $stmt_setups->fetchAll();
                 <label for="car_performance_notes" class="form-label">Car Performance & Driver Feedback</label>
                 <textarea class="form-control" id="car_performance_notes" name="car_performance_notes" rows="3"><?php echo htmlspecialchars($log_data['car_performance_notes']); ?></textarea>
             </div>
-            <div class="col-md-12">
+             <div class="col-md-12">
                 <label for="lap_times" class="form-label">Individual Lap Times</label>
                 <textarea class="form-control" id="lap_times" name="lap_times" rows="5"><?php echo htmlspecialchars($lap_times_string); ?></textarea>
             </div>

@@ -25,7 +25,7 @@ $stmt_log = $pdo->prepare("
         rear_tires.set_name as rear_tire_name
     FROM race_logs rl
     JOIN race_events e ON rl.event_id = e.id
-    JOIN venues v ON e.venue_id = v.id
+    LEFT JOIN venues v ON e.venue_id = v.id
     LEFT JOIN tracks t ON rl.track_id = t.id
     LEFT JOIN setups s ON rl.setup_id = s.id
     LEFT JOIN models m ON s.model_id = m.id
@@ -47,9 +47,20 @@ $stmt_laps = $pdo->prepare("SELECT lap_number, lap_time FROM race_lap_times WHER
 $stmt_laps->execute([$log_id]);
 $lap_times = $stmt_laps->fetchAll(PDO::FETCH_ASSOC);
 
+// --- NEW: Find the fastest and slowest lap times ---
+$fastest_lap_value = null;
+$slowest_lap_value = null;
+if (!empty($lap_times)) {
+    $lap_time_values = array_column($lap_times, 'lap_time');
+    // Convert to float for accurate comparison
+    $lap_time_values_float = array_map('floatval', $lap_time_values);
+    $fastest_lap_value = min($lap_time_values_float);
+    $slowest_lap_value = max($lap_time_values_float);
+}
+
 // 3. Prepare the data for Chart.js
-$chart_labels = []; // e.g., ["Lap 1", "Lap 2", ...]
-$chart_data = [];   // e.g., [12.5, 11.8, 11.9, ...]
+$chart_labels = [];
+$chart_data = [];
 foreach ($lap_times as $lap) {
     $chart_labels[] = "Lap " . $lap['lap_number'];
     $chart_data[] = floatval($lap['lap_time']);
@@ -89,68 +100,83 @@ foreach ($lap_times as $lap) {
     <?php endif; ?>
 
     <!-- Log Details -->
-    <div class="card">
-        <div class="card-header">
-            <h5>Session Details</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <h6>Performance Metrics</h6>
-                    <ul class="list-group">
-                        <li class="list-group-item"><strong>Result:</strong> <?php echo ($log['laps_completed'] ? $log['laps_completed'] . ' / ' . $log['total_race_time'] : 'N/A'); ?></li>
-                        <li class="list-group-item"><strong>Finishing Position:</strong> <?php echo htmlspecialchars($log['finishing_position'] ?: 'N/A'); ?></li>
-                        <li class="list-group-item"><strong>Best Lap:</strong> <?php echo htmlspecialchars($log['best_lap_time'] ?: 'N/A'); ?></li>
-                        <li class="list-group-item"><strong>Best 10 Avg:</strong> <?php echo htmlspecialchars($log['best_10_avg'] ?: 'N/A'); ?></li>
-                        <li class="list-group-item"><strong>Best 3 Consecutive:</strong> <?php echo htmlspecialchars($log['best_3_consecutive_avg'] ?: 'N/A'); ?></li>
-                    </ul>
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5>Session Details</h5>
                 </div>
-                <div class="col-md-6">
-                    <h6>Setup & Conditions</h6>
-                    <ul class="list-group">
-                        <li class="list-group-item"><strong>Setup Used:</strong> 
-                            <?php if ($log['setup_id']): ?>
-                                <a href="setup_form.php?setup_id=<?php echo $log['setup_id']; ?>"><?php echo htmlspecialchars($log['model_name'] . ' - ' . $log['setup_name']); ?></a>
-                            <?php else: ?>
-                                Not Assigned
-                            <?php endif; ?>
-                        </li>
-                        <li class="list-group-item"><strong>Tires:</strong><br>
-                            <small>
-                                <?php if($log['front_tire_name']) echo '<strong>Front:</strong> ' . htmlspecialchars($log['front_tire_name']); ?>
-                                <?php if($log['rear_tire_name']) echo '<br><strong>Rear:</strong> ' . htmlspecialchars($log['rear_tire_name']); ?>
-                            </small>
-                        </li>
-                        <li class="list-group-item"><strong>Car Notes:</strong><br><?php echo nl2br(htmlspecialchars($log['car_performance_notes'] ?: 'N/A')); ?></li>
-                        <li class="list-group-item"><strong>Track Notes:</strong><br><?php echo nl2br(htmlspecialchars($log['track_conditions_notes'] ?: 'N/A')); ?></li>
-                    </ul>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Performance Metrics</h6>
+                            <ul class="list-group">
+                                <li class="list-group-item"><strong>Result:</strong> <?php echo ($log['laps_completed'] ? $log['laps_completed'] . ' / ' . $log['total_race_time'] : 'N/A'); ?></li>
+                                <li class="list-group-item"><strong>Finishing Position:</strong> <?php echo htmlspecialchars($log['finishing_position'] ?: 'N/A'); ?></li>
+                                <li class="list-group-item"><strong>Best Lap:</strong> <?php echo htmlspecialchars($log['best_lap_time'] ?: 'N/A'); ?></li>
+                                <li class="list-group-item"><strong>Best 10 Avg:</strong> <?php echo htmlspecialchars($log['best_10_avg'] ?: 'N/A'); ?></li>
+                                <li class="list-group-item"><strong>Best 3 Consecutive:</strong> <?php echo htmlspecialchars($log['best_3_consecutive_avg'] ?: 'N/A'); ?></li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Setup & Conditions</h6>
+                            <ul class="list-group">
+                                <li class="list-group-item"><strong>Setup Used:</strong> 
+                                    <?php if ($log['setup_id']): ?>
+                                        <a href="setup_form.php?setup_id=<?php echo $log['setup_id']; ?>"><?php echo htmlspecialchars($log['model_name'] . ' - ' . $log['setup_name']); ?></a>
+                                    <?php else: ?>
+                                        Not Assigned
+                                    <?php endif; ?>
+                                </li>
+                                <li class="list-group-item"><strong>Tires:</strong><br>
+                                    <small>
+                                        <?php if($log['front_tire_name']) echo '<strong>Front:</strong> ' . htmlspecialchars($log['front_tire_name']); ?>
+                                        <?php if($log['rear_tire_name']) echo '<br><strong>Rear:</strong> ' . htmlspecialchars($log['rear_tire_name']); ?>
+                                    </small>
+                                </li>
+                                <li class="list-group-item"><strong>Car Notes:</strong><br><?php echo nl2br(htmlspecialchars($log['car_performance_notes'] ?: 'N/A')); ?></li>
+                                <li class="list-group-item"><strong>Track Notes:</strong><br><?php echo nl2br(htmlspecialchars($log['track_conditions_notes'] ?: 'N/A')); ?></li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Individual Lap Times Table -->
-    <?php if (!empty($lap_times)): ?>
-    <div class="card mt-4">
-        <div class="card-header">
-            <h5>Individual Lap Times</h5>
-        </div>
-        <div class="card-body">
-            <table class="table table-sm table-striped">
-                <thead><tr><th>Lap</th><th>Time</th></tr></thead>
-                <tbody>
-                    <?php foreach ($lap_times as $lap): ?>
-                    <tr>
-                        <td><?php echo $lap['lap_number']; ?></td>
-                        <td><?php echo $lap['lap_time']; ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+        <!-- Individual Lap Times Table -->
+        <div class="col-lg-4 mb-4">
+            <?php if (!empty($lap_times)): ?>
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5>Individual Lap Times</h5>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-striped">
+                        <thead><tr><th>Lap</th><th>Time</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($lap_times as $lap): ?>
+                                <?php
+                                    // --- NEW: Add styling for fastest/slowest laps ---
+                                    $current_lap_float = floatval($lap['lap_time']);
+                                    $row_class = '';
+                                    if ($current_lap_float == $fastest_lap_value) {
+                                        $row_class = 'table-success fw-bold';
+                                    } elseif ($current_lap_float == $slowest_lap_value) {
+                                        $row_class = 'table-danger';
+                                    }
+                                ?>
+                                <tr class="<?php echo $row_class; ?>">
+                                    <td><?php echo $lap['lap_number']; ?></td>
+                                    <td><?php echo $lap['lap_time']; ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
-    <?php endif; ?>
-
 </div>
 
 <!-- JavaScript for the Chart -->
