@@ -30,7 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $api_url .= "&driverName=" . urlencode($driver_name_to_process);
         $api_url .= "&raceClass=" . urlencode($race_class_to_process);
 
-        // Use cURL for a more robust connection
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $api_url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -62,7 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             $message = '<div class="alert alert-warning">This event already exists in your log. Import skipped.</div>';
                             $pdo->rollBack();
                         } else {
-                            // Insert the new event, linking it to the VENUE, with a NULL track_id for now
                             $stmt_event = $pdo->prepare("INSERT INTO race_events (user_id, venue_id, event_name, event_date, track_id) VALUES (?, ?, ?, ?, ?)");
                             $stmt_event->execute([$user_id, $venue_id_to_import, $event_name, $event_date_for_db, null]);
                             $new_event_id = $pdo->lastInsertId();
@@ -105,8 +103,17 @@ $stmt_importable_venues = $pdo->prepare("SELECT id, name, official_venue_id FROM
 $stmt_importable_venues->execute([$user_id]);
 $importable_venues = $stmt_importable_venues->fetchAll();
 
+// --- THIS IS THE CORRECTED QUERY ---
 // Fetch all existing Race Events to display in the list
-$stmt_events = $pdo->prepare("SELECT e.*, t.name as track_name, v.name as venue_name FROM race_events e JOIN venues v ON e.venue_id = v.id LEFT JOIN tracks t ON e.track_id = t.id WHERE e.user_id = ? ORDER BY e.event_date DESC");
+// It now uses LEFT JOIN for both venues and tracks for maximum safety.
+$stmt_events = $pdo->prepare("
+    SELECT e.*, t.name as track_name, v.name as venue_name 
+    FROM race_events e 
+    LEFT JOIN venues v ON e.venue_id = v.id 
+    LEFT JOIN tracks t ON e.track_id = t.id 
+    WHERE e.user_id = ? 
+    ORDER BY e.event_date DESC
+");
 $stmt_events->execute([$user_id]);
 $events_list = $stmt_events->fetchAll();
 ?>
@@ -166,7 +173,7 @@ $events_list = $stmt_events->fetchAll();
                         <small><?php echo date("D, M j, Y", strtotime($event['event_date'])); ?></small>
                     </div>
                     <p class="mb-1">
-                        Venue: <?php echo htmlspecialchars($event['venue_name']); ?> | 
+                        Venue: <?php echo htmlspecialchars($event['venue_name'] ?? 'Venue Not Found'); ?> | 
                         Layout: 
                         <?php if ($event['track_id']): ?>
                             <span class="fw-bold"><?php echo htmlspecialchars($event['track_name']); ?></span>
