@@ -4,13 +4,26 @@ require 'auth.php';
 requireLogin();
 
 $user_id = $_SESSION['user_id'];
+$message = '';
 
-// --- Fetch User's Name ---
-$stmt_user = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+// Handle form submission to update profile settings
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_settings') {
+    $default_venue_id = !empty($_POST['default_venue_id']) ? intval($_POST['default_venue_id']) : null;
+    $default_driver_name = trim($_POST['default_driver_name']);
+    $default_race_class = trim($_POST['default_race_class']);
+
+    $stmt = $pdo->prepare("UPDATE users SET default_venue_id = ?, default_driver_name = ?, default_race_class = ? WHERE id = ?");
+    $stmt->execute([$default_venue_id, $default_driver_name, $default_race_class, $user_id]);
+    
+    $message = '<div class="alert alert-success">Your settings have been updated successfully.</div>';
+}
+
+// Fetch all user data, including new settings
+$stmt_user = $pdo->prepare("SELECT username, default_venue_id, default_driver_name, default_race_class FROM users WHERE id = ?");
 $stmt_user->execute([$user_id]);
-$username = $stmt_user->fetchColumn();
+$user_data = $stmt_user->fetch(PDO::FETCH_ASSOC);
 
-// --- Fetch User's Stats (reusing queries from index.php) ---
+// --- Fetch User's Stats (from original file) ---
 // Count Models
 $stmt_models_count = $pdo->prepare("SELECT COUNT(*) FROM models WHERE user_id = ?");
 $stmt_models_count->execute([$user_id]);
@@ -37,7 +50,7 @@ $logs_count = $stmt_logs_count->fetchColumn();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>User Profile - Pan Car Setup App</title>
+    <title>User Profile - Tweak Lab</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -45,50 +58,39 @@ $logs_count = $stmt_logs_count->fetchColumn();
 <?php require 'header.php'; ?>
 <div class="container mt-3">
     <h1>User Profile</h1>
-    <p class="lead">Welcome, <?php echo htmlspecialchars($username); ?>!</p>
+    <p class="lead">Welcome, <?php echo htmlspecialchars($user_data['username']); ?>!</p>
+    <?php echo $message; ?>
     <hr>
 
     <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Your Statistics</h5>
-                </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Total Car Models
-                        <span class="badge bg-primary rounded-pill"><?php echo $models_count; ?></span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Total Setups
-                        <span class="badge bg-primary rounded-pill"><?php echo $setups_count; ?></span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Total Race Events
-                        <span class="badge bg-primary rounded-pill"><?php echo $events_count; ?></span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Total Race Logs
-                        <span class="badge bg-primary rounded-pill"><?php echo $logs_count; ?></span>
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Account Management</h5>
-                </div>
+        <!-- Importer Settings Column -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><h5>Importer Settings</h5></div>
                 <div class="card-body">
-                    <p>Manage your account settings and password.</p>
-                    <a href="change_password.php" class="btn btn-primary">Change Password</a>
+                    <p>Set your default values for the Race Event importer. These will be pre-filled on the Events page.</p>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="update_settings">
+                        <div class="mb-3">
+                            <label for="default_venue_id" class="form-label">Default Venue ID</label>
+                            <input type="number" class="form-control" id="default_venue_id" name="default_venue_id" value="<?php echo htmlspecialchars($user_data['default_venue_id'] ?? ''); ?>" placeholder="e.g., 1053">
+                        </div>
+                        <div class="mb-3">
+                            <label for="default_driver_name" class="form-label">Default Driver Name</label>
+                            <input type="text" class="form-control" id="default_driver_name" name="default_driver_name" value="<?php echo htmlspecialchars($user_data['default_driver_name'] ?? ''); ?>" placeholder="e.g., Paul Webb">
+                        </div>
+                        <div class="mb-3">
+                            <label for="default_race_class" class="form-label">Default Race Class</label>
+                            <input type="text" class="form-control" id="default_race_class" name="default_race_class" value="<?php echo htmlspecialchars($user_data['default_race_class'] ?? ''); ?>" placeholder="e.g., Mini BL">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
 
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+        <!-- Account Management & Stats Column -->
+        <div class="col-lg-6 mb-4">
+            <div class="card mb-4">
+                <div class="card-header"><h5>Account Management</h5></div>
+                <div class="card-body
