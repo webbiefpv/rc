@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if ($venue_id_to_process && $driver_name_to_process) {
         // 2. Build the API URL and call the Python scraper
-        $api_url = "http://109.155.110.165/scrape"; // Your Python server IP
+        $api_url = "http://rcscraper.ddns.net/scrape"; // Your Python server IP
         $api_url .= "?venueId=" . urlencode($venue_id_to_process);
         $api_url .= "&driverName=" . urlencode($driver_name_to_process);
         $api_url .= "&raceClass=" . urlencode($race_class_to_process);
