@@ -63,7 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $driver_name_to_process = $user_settings['default_driver_name'] ?? '';
         $race_class_to_process = $user_settings['default_race_class'] ?? 'Mini BL';
 
-        if ($venue_id_to_process && $driver_name_to_process) {
+        // --- THIS IS THE FIX: More robust check for all required parameters ---
+        if ($venue_id_to_process && !empty($driver_name_to_process) && !empty($race_class_to_process)) {
             $api_url = "http://rcscraper.ddns.net/scrape";
             $api_url .= "?venueId=" . urlencode($venue_id_to_process);
             $api_url .= "&driverName=" . urlencode($driver_name_to_process);
@@ -133,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
         } else {
-            $message = '<div class="alert alert-danger">Could not import. Ensure the selected venue has an Official ID and your profile has a default driver name set.</div>';
+            $message = '<div class="alert alert-danger">Could not import. Ensure the selected venue has an Official ID and your profile has a default driver name and race class set.</div>';
         }
     }
 }
@@ -159,7 +160,7 @@ $events_list = $stmt_events->fetchAll();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale-1">
     <title>Race Events - Tweak Lab</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
