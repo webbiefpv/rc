@@ -14,7 +14,9 @@ $user_settings = $stmt_user_settings->fetch(PDO::FETCH_ASSOC);
 // --- Handle ALL POST actions for this page ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
-    // --- Handle DELETING a Race Event ---
+    // --- NEW LOGIC: Use 'if/elseif' to handle actions exclusively ---
+    
+    // Handle DELETING a Race Event
     if ($_POST['action'] === 'delete_event') {
         $event_id_to_delete = intval($_POST['event_id']);
 
@@ -24,23 +26,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($stmt_check->fetch()) {
             $pdo->beginTransaction();
             try {
-                // Get all race log IDs associated with this event to delete their children first
                 $stmt_get_logs = $pdo->prepare("SELECT id FROM race_logs WHERE event_id = ?");
                 $stmt_get_logs->execute([$event_id_to_delete]);
                 $log_ids = $stmt_get_logs->fetchAll(PDO::FETCH_COLUMN);
 
                 if (!empty($log_ids)) {
-                    // Use the list of log IDs to delete all associated lap times
                     $in_query = implode(',', array_fill(0, count($log_ids), '?'));
                     $stmt_delete_laps = $pdo->prepare("DELETE FROM race_lap_times WHERE race_log_id IN ($in_query)");
                     $stmt_delete_laps->execute($log_ids);
                 }
 
-                // Delete the race logs linked to the event
                 $stmt_delete_logs = $pdo->prepare("DELETE FROM race_logs WHERE event_id = ?");
                 $stmt_delete_logs->execute([$event_id_to_delete]);
                 
-                // Finally, delete the event itself
                 $stmt_delete_event = $pdo->prepare("DELETE FROM race_events WHERE id = ?");
                 $stmt_delete_event->execute([$event_id_to_delete]);
 
@@ -52,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
     } 
-    // --- Handle IMPORTING a new event ---
+    // Handle IMPORTING a new event
     elseif ($_POST['action'] === 'import_latest') {
         $venue_id_to_import = intval($_POST['venue_id']);
 
@@ -63,8 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $driver_name_to_process = $user_settings['default_driver_name'] ?? '';
         $race_class_to_process = $user_settings['default_race_class'] ?? 'Mini BL';
 
-        // --- THIS IS THE FIX: More robust check for all required parameters ---
-        if ($venue_id_to_process && !empty($driver_name_to_process) && !empty($race_class_to_process)) {
+        if ($venue_id_to_process && $driver_name_to_process) {
             $api_url = "http://rcscraper.ddns.net/scrape";
             $api_url .= "?venueId=" . urlencode($venue_id_to_process);
             $api_url .= "&driverName=" . urlencode($driver_name_to_process);
@@ -134,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
         } else {
-            $message = '<div class="alert alert-danger">Could not import. Ensure the selected venue has an Official ID and your profile has a default driver name and race class set.</div>';
+            $message = '<div class="alert alert-danger">Could not import. Ensure the selected venue has an Official ID and your profile has a default driver name set.</div>';
         }
     }
 }
@@ -160,7 +157,7 @@ $events_list = $stmt_events->fetchAll();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Race Events - Tweak Lab</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
